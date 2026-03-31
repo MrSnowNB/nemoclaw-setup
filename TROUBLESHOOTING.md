@@ -135,3 +135,20 @@ prevention: |
   Before any NemoClaw install, verify df -h shows >= 50 GB free on Docker root partition.
   Add this check to the pre-flight section of REPLICATION-NOTES.md.
 ```
+
+---
+
+## Persona Drift Investigation 2026-03-31
+
+1. **Is ALICE.md being read from disk on every request, or cached at startup?**
+   It is read directly from disk on every single request inside the `build_system_prompt(user_id)` function calling `alice_path.read_text()`.
+
+2. **Is {{MEMORY_BLOCK}} being replaced with actual memory content, or is it being sent literally to the LLM?**
+   It is successfully being replaced with the actual formatted database memory content (`fact_str`) via the `.replace("{{MEMORY_BLOCK}}", fact_str)` function before being passed to the LLM API. 
+
+3. **What is the full system prompt Alice receives for a new user with no prior hops?**
+   She actually receives **two contradictory** system prompts stacked together during the first turn.
+   1. The hardcoded legacy prompt from `SYSTEM_PROMPTS['alice']` in `state_bus.py`: `"You are Alice, a curious and empathetic guide. Give a helpful, direct response."`
+   2. Our injected prompt from `forge_server.py`: `"You are Alice.\nNo prior memory."` (assuming `ALICE.md` doesn't exist).
+   
+   Furthermore, because `state_bus.hop` truncates history to strictly `history[-6:]`, our injected `ALICE.md` system prompt (which is prepended to the array in `forge_server.py`) gets permanently deleted from context once the conversation exceeds 3 exchanges, leaving Alice with only the generic hardcoded system prompt — causing the severe persona and memory drift.
