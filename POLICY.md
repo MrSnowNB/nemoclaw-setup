@@ -1,10 +1,10 @@
 ---
 title: NemoClaw Project Policy
-version: 1.0.0
+version: 1.1.0
 owner: MrSnowNB
 hardware: HP Z8 Fury G5 (Xeon w7-3455, 512 GiB RAM, 4x RTX A6000 48GB)
 status: active
-updated: 2026-03-30
+updated: 2026-03-31
 ---
 
 # NemoClaw Project Policy
@@ -39,13 +39,33 @@ Plan → Build → Validate → Review → Release
 ## Validation Gates
 
 All four gates must be green before a task moves to Review.
+Gates run **only against the active source paths** for the current task.
+Legacy, deprecated, or out-of-scope directories are always excluded.
 
 | Gate | Command | Pass Condition |
 |---|---|---|
 | `unit` | `pytest -q` | Zero failures, zero errors |
-| `lint` | `ruff check . && flake8 .` | Zero violations |
-| `type` | `mypy . && pyright .` | Zero type errors |
+| `lint` | `ruff check src/ tests/ && flake8 src/ tests/` | Zero violations in active paths |
+| `type` | `mypy src/ tests/ --strict` | Zero type errors in active paths |
 | `docs` | spec drift check | No undocumented public interfaces |
+
+### Gate Scope Rule
+
+Gates must never be run against directories the agent is explicitly
+forbidden to modify. If a task excludes a directory (e.g. `past_experiments/`,
+a vendor folder, or a legacy module), that directory is **always excluded
+from all gate commands** for that task.
+
+A gate failure caused entirely by out-of-scope code is **not a valid
+blocking failure**. The agent must:
+1. Confirm the failure is 100% in excluded paths (no active-path violations).
+2. Re-run the gate scoped to active paths only.
+3. If active paths are clean, proceed. Log the exclusion in REPLICATION-NOTES.md.
+4. If any active-path violations remain, halt per Failure Handling Protocol.
+
+> **Example:** `ruff check .` fails on `past_experiments/shrp_logger.py`.
+> Correct response: re-run as `ruff check src/ tests/`. If clean, proceed.
+> Do NOT halt for violations in files the agent cannot touch.
 
 ## Failure Handling Protocol
 
