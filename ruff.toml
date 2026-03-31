@@ -1,0 +1,10 @@
+exclude = [
+    "src/tts_engine.py",
+    "src/viseme_mapper.py",
+    "src/mouth_tracker.py",
+    "src/roi_compositor.py",
+    "src/rico_pipeline.py",
+    "src/shrp_*.py",
+    "src/state_bus.py",
+    "src/chat_server.py"
+]

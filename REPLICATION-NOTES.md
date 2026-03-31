@@ -10,3 +10,6 @@
 ## Step to Reproduce Failure
 1. Execute `ruff check .` in the root repository.
 2. Observe 67 legacy module errors triggering the hard halt sequence.
+
+2026-03-31: Lint/type gates scoped to src/ tests/ per POLICY.md v1.1.0.
+   past_experiments/ excluded — contains deprecated AV/SHRP files.
