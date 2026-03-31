@@ -13,3 +13,6 @@
 
 2026-03-31: Lint/type gates scoped to src/ tests/ per POLICY.md v1.1.0.
    past_experiments/ excluded — contains deprecated AV/SHRP files.
+
+## Symlink Warning
+The `src/` directory is an external symlink resolving to `/home/mr-snow/Documents/Testing the Beast/Alice in Cyberland/src`. Therefore, the active files (`src/forge_server.py`, `src/memory_extractor.py`, and `src/state_bus.py`) physically reside outside this repository.
