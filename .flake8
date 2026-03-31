@@ -1,0 +1,16 @@
+[flake8]
+exclude =
+    src/tts_engine.py,
+    src/viseme_mapper.py,
+    src/mouth_tracker.py,
+    src/roi_compositor.py,
+    src/rico_pipeline.py,
+    src/shrp_checkpoint_manager.py,
+    src/shrp_event_emitter.py,
+    src/shrp_logger.py,
+    src/shrp_recovery_engine.py,
+    src/state_bus.py,
+    src/chat_server.py,
+    src/video_duration_matcher.py,
+    past_experiments/
+ignore = E402
