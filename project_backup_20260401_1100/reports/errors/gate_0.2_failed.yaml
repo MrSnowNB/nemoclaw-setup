@@ -1,0 +1,10 @@
+escalation_id: "ESC_2025-10-26_T0.2"
+severity: "high"
+task_context: "T0.2: Install Python dependencies"
+error_summary: "AI/ML dependencies installation failed - PyTorch install failed due to network connectivity and Python 3.13 compatibility"
+attempted_fixes:
+  - "Initial install: CUDA PyTorch from pytorch.org/whl/cu121"
+  - "Fallback: CPU PyTorch same URL"
+  - "Result: Network DNS resolution failure, no distribution found for torch==2.1.0 on Python 3.13"
+recommended_action: "Resolve network connectivity or downgrade Python to 3.10/3.11, or allow CPU-only deployment for POC development"
+wait_for_human: true

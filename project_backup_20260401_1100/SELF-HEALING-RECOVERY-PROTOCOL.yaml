@@ -1,0 +1,862 @@
+# SELF-HEALING CODING AGENT RECOVERY PROTOCOL
+# Real-Time Debugging & Validation Framework
+# Garage AGI Core Problem #1: Simulated vs. Runtime Testing
+# Date: 2025-11-03
+
+# ============================================================================
+# PROBLEM DIAGNOSIS: SIMULATED TESTING FAILURE
+# ============================================================================
+
+incident_analysis:
+  problem_type: "Hallucinated Success - Simulated Testing"
+  
+  what_happened:
+    - "Agent claimed tests passed without executing actual commands"
+    - "TTS audio generation silently failing (Audio=null)"
+    - "Video loops stuck because no audio completion event"
+    - "No actual LLM responses despite 'success' logs"
+  
+  root_cause:
+    primary: "Agent performed logical reasoning about test outcomes instead of executing"
+    secondary: "No runtime validation checkpoints enforced"
+    tertiary: "Missing error detection in actual system execution"
+  
+  evidence:
+    - "Console shows 'Audio=null' in actual running system"
+    - "RICo videos generate but audio files missing from outputs/audio/"
+    - "Ollama/LLM not returning responses"
+    - "Tests were 'passed' conceptually, not executed"
+  
+  impact:
+    user_experience: "Non-functional chatbot - appears broken"
+    development_time: "Wasted hours debugging vs. prevented by proper testing"
+    trust_degradation: "Agent's validation claims unreliable"
+
+# ============================================================================
+# SELF-HEALING RECOVERY FRAMEWORK
+# ============================================================================
+
+recovery_strategy:
+  phase: "EMERGENCY_TRIAGE"
+  approach: "Runtime-First Validation with Self-Correction"
+  
+  core_principles:
+    1: "Never trust simulated outcomes - execute and measure"
+    2: "Every assertion must produce observable evidence"
+    3: "Failures trigger automated diagnostic routines"
+    4: "Self-healing: detect → diagnose → remediate → verify"
+
+# ============================================================================
+# RECOVERY TASK 0: SYSTEM HEALTH DIAGNOSTIC
+# ============================================================================
+
+task_r0:
+  id: "R0"
+  name: "Runtime System Health Check"
+  priority: "CRITICAL_BLOCKING"
+  estimated_time: "10 minutes"
+  
+  objective: |
+    Execute actual runtime tests to establish ground truth about system state.
+    NO assumptions, NO simulations - only measured reality.
+  
+  steps:
+    - step_id: "R0.1"
+      name: "Validate Python Environment"
+      execute:
+        - command: "python --version"
+          expected_output: "Python 3.10.* or higher"
+          on_failure: "HALT - Python version incompatible"
+        
+        - command: "python -c 'import sys; print(sys.prefix)'"
+          purpose: "Verify virtual environment active"
+          expected_output: "Path containing 'venv' or 'env'"
+          on_failure: "WARN - Running in global environment (acceptable)"
+        
+        - command: "pip list | grep -E '(fastapi|uvicorn|pyttsx3)'"
+          expected_output: "All three packages listed"
+          on_failure: "HALT - Core dependencies missing"
+      
+      evidence_required:
+        - "Screenshot or copy-paste of terminal output"
+        - "Actual version numbers visible"
+      
+      self_healing:
+        if_missing_packages:
+          - "pip install fastapi uvicorn pyttsx3"
+          - "pip freeze > requirements-verified.txt"
+    
+    - step_id: "R0.2"
+      name: "Test Ollama LLM Connection"
+      execute:
+        - command: "curl -s http://localhost:11434/api/tags | python -m json.tool"
+          expected_output: "JSON response with 'models' array"
+          on_failure: "Ollama not running or not responding"
+        
+        - command: "curl -s http://localhost:11434/api/generate -d '{\"model\":\"llama3.1\",\"prompt\":\"test\",\"stream\":false}' | python -m json.tool"
+          expected_output: "JSON with 'response' field containing text"
+          on_failure: "CRITICAL - LLM not generating responses"
+      
+      evidence_required:
+        - "Actual JSON response from LLM"
+        - "Non-empty 'response' field"
+      
+      self_healing:
+        if_not_running:
+          - "ollama serve &"
+          - "sleep 5"
+          - "Re-test connection"
+        
+        if_model_missing:
+          - "ollama pull llama3.1"
+          - "Wait for download completion"
+          - "Re-test generation"
+    
+    - step_id: "R0.3"
+      name: "Test TTS Audio Generation"
+      execute:
+        - command: |
+            python -c "
+            import pyttsx3
+            import os
+            os.makedirs('outputs/audio', exist_ok=True)
+            engine = pyttsx3.init()
+            engine.save_to_file('Testing TTS', 'outputs/audio/test_r0.wav')
+            engine.runAndWait()
+            print('Audio file created:', os.path.exists('outputs/audio/test_r0.wav'))
+            "
+          expected_output: "Audio file created: True"
+          on_failure: "CRITICAL - TTS cannot generate audio files"
+        
+        - command: "ls -lh outputs/audio/test_r0.wav"
+          expected_output: "File exists with size > 0 bytes"
+          on_failure: "TTS created empty file"
+      
+      evidence_required:
+        - "File listing showing test_r0.wav with byte size"
+        - "Playable audio file (verify with system audio player)"
+      
+      self_healing:
+        if_directory_missing:
+          - "mkdir -p outputs/audio outputs/video outputs/logs"
+          - "chmod 755 outputs/"
+          - "Re-test TTS"
+        
+        if_pyttsx3_fails:
+          - "pip uninstall pyttsx3 -y"
+          - "pip install pyttsx3==2.90"
+          - "Re-test TTS"
+    
+    - step_id: "R0.4"
+      name: "Test WebSocket Server"
+      execute:
+        - command: "python -m uvicorn src.chat_server:app --host 0.0.0.0 --port 8080 &"
+          background: true
+          wait: 3
+        
+        - command: "curl -s http://localhost:8080/ | grep -q 'Alice'"
+          expected_output: "Exit code 0 (grep found 'Alice')"
+          on_failure: "Frontend not loading"
+        
+        - command: "pkill -f 'uvicorn.*chat_server'"
+          purpose: "Clean shutdown of test server"
+      
+      evidence_required:
+        - "Server starts without import errors"
+        - "Homepage loads in browser"
+      
+      self_healing:
+        if_port_conflict:
+          - "pkill -f uvicorn"
+          - "sleep 2"
+          - "Retry on port 8081"
+        
+        if_import_error:
+          - "Log error to outputs/logs/r0_import_error.txt"
+          - "Check Python path and module structure"
+          - "ESCALATE - requires manual code fix"
+  
+  gate: "GATE_R0"
+  gate_validation:
+    - assertion: "Python environment functional"
+      test: "python -c 'import fastapi, pyttsx3, uvicorn'"
+      evidence: "Terminal output showing no errors"
+      criticality: "CRITICAL"
+    
+    - assertion: "Ollama LLM responding"
+      test: "curl -s http://localhost:11434/api/tags | grep -q 'models'"
+      evidence: "JSON response with model list"
+      criticality: "CRITICAL"
+    
+    - assertion: "TTS generates actual audio files"
+      test: "test -f outputs/audio/test_r0.wav && [ $(stat -f%z outputs/audio/test_r0.wav 2>/dev/null || stat -c%s outputs/audio/test_r0.wav) -gt 1000 ]"
+      evidence: "File exists and is >1KB"
+      criticality: "CRITICAL"
+    
+    - assertion: "Server starts without errors"
+      test: "Manual - Start server, check browser console"
+      evidence: "Screenshot of working homepage"
+      criticality: "HIGH"
+  
+  on_gate_pass:
+    actions:
+      - "Create outputs/logs/gate_r0_passed.yaml with all evidence"
+      - "Proceed to R1 - Code Audit"
+  
+  on_gate_fail:
+    actions:
+      - "Create outputs/logs/gate_r0_failed.yaml with error details"
+      - "Execute self-healing routines for each failed assertion"
+      - "Re-run R0 after healing"
+      - "If fails 3 times: ESCALATE to human with diagnostic report"
+
+# ============================================================================
+# RECOVERY TASK 1: CODE AUDIT & ERROR DETECTION
+# ============================================================================
+
+task_r1:
+  id: "R1"
+  name: "Automated Code Audit - Find Actual Bugs"
+  priority: "CRITICAL"
+  estimated_time: "15 minutes"
+  dependencies: ["R0"]
+  
+  objective: |
+    Scan actual codebase for known failure patterns.
+    Compare claimed implementation vs. actual runtime behavior.
+  
+  steps:
+    - step_id: "R1.1"
+      name: "Audit TTS Implementation in chat_server.py"
+      execute:
+        - command: |
+            python -c "
+            import ast
+            import sys
+            
+            with open('src/chat_server.py', 'r') as f:
+                code = f.read()
+            
+            # Check 1: Does TTS synthesis return a path?
+            if 'save_to_file' not in code and 'runAndWait' not in code:
+                print('❌ CRITICAL: TTS not saving audio files')
+                sys.exit(1)
+            
+            # Check 2: Is audio path returned to client?
+            if 'audio' in code and 'audio_path' in code:
+                print('✅ Audio path handling present')
+            else:
+                print('⚠️  WARNING: Audio path may not be sent to client')
+            
+            # Check 3: Is outputs/audio/ directory created?
+            if 'makedirs' in code or 'mkdir' in code:
+                print('✅ Output directory creation present')
+            else:
+                print('❌ CRITICAL: No code to create outputs/ directories')
+                sys.exit(1)
+            "
+          expected_output: "All ✅ checks pass"
+          on_failure: "TTS implementation incomplete"
+      
+      evidence_required:
+        - "Actual code snippet showing save_to_file call"
+        - "Actual code snippet showing audio path return"
+      
+      fixes_available:
+        missing_save_to_file:
+          location: "src/chat_server.py - WebSocket handler"
+          find: "tts_engine.synthesize(ai_response)"
+          replace_with: |
+            import uuid
+            audio_filename = f"response_{uuid.uuid4().hex[:8]}.wav"
+            audio_path = os.path.join("outputs/audio", audio_filename)
+            tts_engine.save_to_file(ai_response, audio_path)
+            tts_engine.runAndWait()
+        
+        missing_directory_creation:
+          location: "src/chat_server.py - Startup event"
+          add_after: "app = FastAPI()"
+          code: |
+            @app.on_event("startup")
+            async def startup_event():
+                os.makedirs("outputs/audio", exist_ok=True)
+                os.makedirs("outputs/video", exist_ok=True)
+                os.makedirs("outputs/logs", exist_ok=True)
+    
+    - step_id: "R1.2"
+      name: "Audit LLM Integration"
+      execute:
+        - command: |
+            grep -n "ollama\|llm\|generate" src/chat_server.py | head -20
+          purpose: "Find LLM call location"
+        
+        - command: |
+            python -c "
+            import re
+            with open('src/chat_server.py', 'r') as f:
+                code = f.read()
+            
+            # Look for error handling around LLM calls
+            if 'try:' in code and 'except' in code:
+                print('✅ Error handling present')
+            else:
+                print('⚠️  No try/except around LLM calls - errors fail silently')
+            
+            # Check for timeout handling
+            if 'timeout' in code.lower():
+                print('✅ Timeout handling present')
+            else:
+                print('⚠️  No timeout - LLM hangs can freeze server')
+            "
+          expected_output: "Error and timeout handling present"
+      
+      fixes_available:
+        add_error_handling:
+          location: "src/chat_server.py - LLM call"
+          wrap_with: |
+            try:
+                ai_response = get_llm_response(user_message, timeout=30)
+            except TimeoutError:
+                ai_response = "I'm sorry, I'm having trouble thinking right now. Please try again."
+                logger.error("LLM timeout")
+            except Exception as e:
+                ai_response = "I encountered an error. Let's try that again."
+                logger.error(f"LLM error: {e}")
+    
+    - step_id: "R1.3"
+      name: "Audit Frontend WebSocket Handling"
+      execute:
+        - command: |
+            grep -A 10 "handleAliceResponse\|ws.onmessage" templates/index.html
+          purpose: "Check if frontend handles null audio"
+        
+        - command: |
+            python -c "
+            import re
+            with open('templates/index.html', 'r') as f:
+                code = f.read()
+            
+            # Check for null checks
+            if 'if (data.audio)' in code or 'data.audio !== null' in code:
+                print('✅ Null audio handling present')
+            else:
+                print('❌ CRITICAL: No check for null audio - playback will fail')
+            "
+      
+      fixes_available:
+        add_null_check:
+          location: "templates/index.html - handleAliceResponse function"
+          add_before_audio_play: |
+            if (!data.audio || data.audio === 'null') {
+                console.error('❌ No audio file received from server');
+                // Still show video and text, just no audio
+                addMessage('alice', data.text);
+                video.src = data.video || '/static/video_clips/speaking-nuetral.mp4';
+                video.play();
+                return;
+            }
+  
+  gate: "GATE_R1"
+  gate_validation:
+    - assertion: "TTS implementation complete"
+      test: "grep -q 'save_to_file' src/chat_server.py && grep -q 'runAndWait' src/chat_server.py"
+      evidence: "Code snippet showing both calls"
+      criticality: "CRITICAL"
+    
+    - assertion: "LLM has error handling"
+      test: "grep -A 5 'get_llm_response' src/chat_server.py | grep -q 'except'"
+      evidence: "Try/except block around LLM call"
+      criticality: "HIGH"
+    
+    - assertion: "Frontend handles null audio"
+      test: "grep -q 'data.audio' templates/index.html"
+      evidence: "Null check before audio.play()"
+      criticality: "HIGH"
+  
+  on_gate_pass:
+    - "Document all found issues in outputs/logs/audit_r1.yaml"
+    - "Proceed to R2 - Automated Fixes"
+  
+  on_gate_fail:
+    - "Generate fix patches for each failed assertion"
+    - "Apply fixes automatically"
+    - "Re-run R1"
+
+# ============================================================================
+# RECOVERY TASK 2: AUTOMATED CODE REPAIR
+# ============================================================================
+
+task_r2:
+  id: "R2"
+  name: "Self-Healing Code Repairs"
+  priority: "CRITICAL"
+  estimated_time: "20 minutes"
+  dependencies: ["R1"]
+  
+  objective: |
+    Apply automated fixes for all detected issues.
+    Use surgical edits - change only broken code, preserve working code.
+  
+  repair_strategy: "Incremental Patch Application with Validation"
+  
+  steps:
+    - step_id: "R2.1"
+      name: "Fix TTS Audio File Generation"
+      backup_first: "cp src/chat_server.py src/chat_server.py.backup_r2"
+      
+      patch:
+        description: "Ensure TTS saves audio to file and returns path"
+        file: "src/chat_server.py"
+        
+        find_section: |
+          # Look for WebSocket message handler
+          @app.websocket("/ws")
+          async def websocket_chat(websocket: WebSocket):
+        
+        find_tts_call: "tts.*synthesize\\(.*\\)"
+        
+        replace_with: |
+          # Generate unique audio filename
+          import uuid
+          audio_filename = f"response_{uuid.uuid4().hex[:8]}.wav"
+          audio_path = os.path.join("outputs/audio", audio_filename)
+          
+          # Ensure directory exists
+          os.makedirs("outputs/audio", exist_ok=True)
+          
+          # Save TTS to file
+          tts_engine.save_to_file(ai_response, audio_path)
+          tts_engine.runAndWait()
+          
+          # Verify file was created
+          if not os.path.exists(audio_path):
+              logger.error(f"❌ Audio file not created: {audio_path}")
+              audio_path = None
+          else:
+              logger.info(f"✅ Audio created: {audio_path}")
+      
+      validate_fix:
+        - "Start server in background"
+        - "Send test message via WebSocket"
+        - "Check outputs/audio/ for new .wav file"
+        - "Verify file size > 1KB"
+      
+      rollback_on_failure:
+        - "mv src/chat_server.py.backup_r2 src/chat_server.py"
+        - "ESCALATE - automated fix failed"
+    
+    - step_id: "R2.2"
+      name: "Fix WebSocket Response Format"
+      
+      patch:
+        description: "Ensure audio path sent to frontend"
+        file: "src/chat_server.py"
+        
+        find: "await websocket.send_json\\("
+        
+        ensure_fields: |
+          await websocket.send_json({
+              "type": "response",
+              "state": emotion_state,
+              "video": f"/videos/ricovideos/{video_filename}",
+              "audio": f"/audio/{os.path.basename(audio_path)}" if audio_path else None,
+              "text": ai_response,
+              "duration": 6.0  # TODO: Calculate actual duration
+          })
+      
+      validate_fix:
+        - "Monitor WebSocket messages in browser console"
+        - "Verify 'audio' field has value (not null)"
+        - "Verify audio URL is accessible"
+    
+    - step_id: "R2.3"
+      name: "Add Audio Serving Endpoint"
+      
+      patch:
+        description: "Create /audio/{filename} endpoint if missing"
+        file: "src/chat_server.py"
+        
+        check_exists: "grep -q '@app.get.*audio' src/chat_server.py"
+        
+        if_missing_add: |
+          from fastapi.responses import FileResponse
+          from pathlib import Path
+          
+          @app.get("/audio/{filename}")
+          async def serve_audio(filename: str):
+              """Serve generated audio files"""
+              audio_path = Path("outputs/audio") / filename
+              if audio_path.exists():
+                  return FileResponse(audio_path, media_type="audio/wav")
+              return JSONResponse({"error": "Audio not found"}, status_code=404)
+      
+      validate_fix:
+        - "curl http://localhost:8080/audio/test_r0.wav"
+        - "Verify returns audio data (not 404)"
+    
+    - step_id: "R2.4"
+      name: "Add Frontend Null Checks"
+      
+      patch:
+        description: "Handle null audio gracefully"
+        file: "templates/index.html"
+        
+        find_function: "handleAliceResponse"
+        
+        add_null_check: |
+          async function handleAliceResponse(data) {
+              // Add message to chat
+              addMessage('alice', data.text);
+              
+              // Check if audio is available
+              if (!data.audio || data.audio === 'null' || data.audio === null) {
+                  console.warn('⚠️  No audio received, showing video only');
+                  
+                  // Show video without audio
+                  video.src = data.video || '/static/video_clips/speaking-nuetral.mp4';
+                  video.loop = false;
+                  video.muted = true;
+                  await video.play();
+                  
+                  // Return to idle after video ends
+                  video.onended = () => {
+                      video.src = '/static/video_clips/idle-loop.mp4';
+                      video.loop = true;
+                      video.play();
+                      isProcessing = false;
+                  };
+                  
+                  return;  // Skip audio playback
+              }
+              
+              // Normal audio+video playback
+              video.src = data.video;
+              audio.src = data.audio;
+              
+              await Promise.all([
+                  video.play(),
+                  audio.play()
+              ]);
+              
+              audio.onended = () => {
+                  video.src = '/static/video_clips/idle-loop.mp4';
+                  video.loop = true;
+                  video.play();
+                  isProcessing = false;
+              };
+          }
+      
+      validate_fix:
+        - "Test in browser with actual messages"
+        - "Verify graceful degradation if audio missing"
+        - "Verify normal playback if audio present"
+  
+  gate: "GATE_R2"
+  gate_validation:
+    - assertion: "All patches applied successfully"
+      test: "diff -q src/chat_server.py src/chat_server.py.backup_r2 | grep -q 'differ'"
+      evidence: "File was modified"
+      criticality: "CRITICAL"
+    
+    - assertion: "Server starts without errors after patches"
+      test: "timeout 5 python -m uvicorn src.chat_server:app --port 8082 2>&1 | grep -v 'error'"
+      evidence: "No error messages in startup"
+      criticality: "CRITICAL"
+    
+    - assertion: "Audio files generate during test"
+      test: "Manual - Send message, check outputs/audio/"
+      evidence: "New .wav file created with size >1KB"
+      criticality: "CRITICAL"
+  
+  on_gate_pass:
+    - "Create outputs/logs/repairs_r2_success.yaml"
+    - "Proceed to R3 - Integration Test"
+  
+  on_gate_fail:
+    - "Rollback all changes"
+    - "Save error log to outputs/logs/repairs_r2_failed.yaml"
+    - "ESCALATE with specific error details"
+
+# ============================================================================
+# RECOVERY TASK 3: RUNTIME INTEGRATION TEST
+# ============================================================================
+
+task_r3:
+  id: "R3"
+  name: "Live System Integration Test"
+  priority: "CRITICAL"
+  estimated_time: "15 minutes"
+  dependencies: ["R2"]
+  
+  objective: |
+    Execute REAL tests on RUNNING system.
+    No simulation - actual browser interaction and measurement.
+  
+  test_protocol: "Human-Supervised Automated Testing"
+  
+  steps:
+    - step_id: "R3.1"
+      name: "Start Production Server"
+      execute:
+        - "pkill -f uvicorn"  # Kill any existing servers
+        - "sleep 2"
+        - "python -m uvicorn src.chat_server:app --host 0.0.0.0 --port 8080 --reload > outputs/logs/server_r3.log 2>&1 &"
+        - "sleep 5"  # Wait for startup
+        - "curl -f http://localhost:8080/ > /dev/null"  # Health check
+      
+      evidence_required:
+        - "Server log showing 'Application startup complete'"
+        - "Browser can load http://localhost:8080"
+    
+    - step_id: "R3.2"
+      name: "Test Scenario 1: Basic Chat Flow"
+      execute:
+        manual_steps:
+          - "Open http://localhost:8080 in Chrome/Edge"
+          - "Open Developer Console (F12)"
+          - "Type message: 'Hello Alice'"
+          - "Click Send button"
+          - "OBSERVE and RECORD:"
+        
+        expected_observations:
+          - "Console shows: 'Connected to Alice'"
+          - "Console shows: 'RICo Response: Videos/..., Audio=/audio/response_XXXXX.wav'"
+          - "Video changes to greeting clip"
+          - "Audio plays (hear voice in speakers)"
+          - "After audio ends, returns to idle-loop.mp4"
+        
+        measurements:
+          - "Time from click to video start: <3 seconds"
+          - "Audio file URL is NOT null"
+          - "Video and audio play simultaneously"
+      
+      evidence_required:
+        - "Screenshot of console showing audio=/audio/response_*.wav"
+        - "Screenshot of outputs/audio/ directory with .wav files"
+        - "Video recording of complete interaction (30 seconds)"
+      
+      pass_criteria:
+        - "Audio file actually downloads to browser (check Network tab)"
+        - "Audio plays audibly"
+        - "Video transitions smoothly"
+      
+      fail_handling:
+        if_audio_null:
+          - "Check outputs/logs/server_r3.log for TTS errors"
+          - "Verify outputs/audio/ directory has files"
+          - "Check browser Network tab for 404 on audio requests"
+          - "ESCALATE with screenshots"
+        
+        if_no_llm_response:
+          - "Test Ollama: curl http://localhost:11434/api/generate -d '{\"model\":\"llama3.1\",\"prompt\":\"test\"}'"
+          - "Check if Ollama is running"
+          - "ESCALATE with Ollama logs"
+    
+    - step_id: "R3.3"
+      name: "Test Scenario 2: Multiple Messages"
+      execute:
+        manual_steps:
+          - "Send 3 messages in succession:"
+          - "  1. 'That's wonderful!'"
+          - "  2. 'I'm confused'"
+          - "  3. 'Goodbye Alice'"
+        
+        expected_observations:
+          - "Each message gets appropriate emotion clip"
+          - "Audio files accumulate in outputs/audio/"
+          - "No errors in console"
+          - "Smooth transitions between states"
+      
+      evidence_required:
+        - "outputs/audio/ contains 3+ .wav files"
+        - "Console log showing all 3 responses"
+      
+      pass_criteria:
+        - "All 3 messages receive audio+video responses"
+        - "No crashes or freezes"
+        - "Returns to idle after each response"
+    
+    - step_id: "R3.4"
+      name: "Collect Runtime Metrics"
+      execute:
+        - command: "ls -lh outputs/audio/*.wav | wc -l"
+          purpose: "Count audio files generated"
+        
+        - command: "du -sh outputs/audio/"
+          purpose: "Measure total audio data"
+        
+        - command: "tail -50 outputs/logs/server_r3.log | grep -i 'error\|warning\|critical'"
+          purpose: "Check for logged errors"
+      
+      evidence_required:
+        - "File count matches number of messages sent"
+        - "Each audio file is >5KB (not empty)"
+        - "No critical errors in server log"
+  
+  gate: "GATE_R3"
+  gate_validation:
+    - assertion: "Server running without crashes"
+      test: "pgrep -f 'uvicorn.*chat_server' > /dev/null"
+      evidence: "Process is alive"
+      criticality: "CRITICAL"
+    
+    - assertion: "Audio files actually generated"
+      test: "[ $(ls -1 outputs/audio/*.wav 2>/dev/null | wc -l) -gt 0 ]"
+      evidence: "At least 1 .wav file exists"
+      criticality: "CRITICAL"
+    
+    - assertion: "Frontend receives audio URLs (not null)"
+      test: "Manual verification from console screenshot"
+      evidence: "Screenshot showing audio=/audio/response_*.wav"
+      criticality: "CRITICAL"
+    
+    - assertion: "Audio plays audibly in browser"
+      test: "Manual - Human hears voice"
+      evidence: "Video recording with audio track"
+      criticality: "CRITICAL"
+  
+  on_gate_pass:
+    - "Create outputs/logs/integration_test_r3_passed.yaml"
+    - "Archive evidence: screenshots, video, logs"
+    - "System is RECOVERED ✅"
+  
+  on_gate_fail:
+    - "Create outputs/logs/integration_test_r3_failed.yaml"
+    - "Include all evidence showing failure points"
+    - "ESCALATE to human with complete diagnostic package"
+
+# ============================================================================
+# SELF-HEALING DECISION TREE
+# ============================================================================
+
+decision_tree:
+  start: "R0"
+  
+  flow:
+    R0:
+      on_pass: "R1"
+      on_fail:
+        if_retry_count_<_3: "Re-run R0 with self-healing"
+        else: "ESCALATE - Environment fundamentally broken"
+    
+    R1:
+      on_pass: "R2"
+      on_fail: "Apply patches from R1 findings, then R2"
+    
+    R2:
+      on_pass: "R3"
+      on_fail:
+        if_safe_to_rollback: "Rollback patches, ESCALATE"
+        else: "ESCALATE - Manual intervention required"
+    
+    R3:
+      on_pass: "RECOVERY_COMPLETE"
+      on_fail: "ESCALATE with full diagnostic report"
+
+# ============================================================================
+# HUMAN ESCALATION PROTOCOL
+# ============================================================================
+
+escalation:
+  when_to_escalate:
+    - "Any gate fails 3 times despite self-healing"
+    - "R3 integration test shows audio still null"
+    - "Server crashes during repair attempts"
+    - "Patch application causes import errors"
+  
+  escalation_package:
+    required_evidence:
+      - "outputs/logs/gate_*.yaml (all gate results)"
+      - "outputs/logs/server_r3.log (server logs)"
+      - "Screenshot of browser console showing error"
+      - "Screenshot of outputs/audio/ directory listing"
+      - "List of applied patches from R2"
+    
+    escalation_message_template: |
+      SELF-HEALING FAILURE - HUMAN INTERVENTION REQUIRED
+      
+      Recovery Phase: [R0/R1/R2/R3]
+      Failed Gate: [GATE_XX]
+      Retry Attempts: [N/3]
+      
+      EVIDENCE:
+      - Server Log: outputs/logs/server_r3.log
+      - Gate Results: outputs/logs/gate_XX_failed.yaml
+      - Screenshots: [attached]
+      
+      SYMPTOMS:
+      - [Describe observed failure]
+      
+      ATTEMPTED FIXES:
+      - [List self-healing actions taken]
+      
+      DIAGNOSIS:
+      - [Agent's best guess at root cause]
+      
+      RECOMMENDATION:
+      - [Suggested manual fix]
+  
+  human_actions:
+    - "Review all evidence files"
+    - "Manually inspect src/chat_server.py changes"
+    - "Test TTS in isolation: python test_tts.py"
+    - "Check Ollama status: curl http://localhost:11434/api/tags"
+    - "Provide agent with specific fix instructions"
+
+# ============================================================================
+# SUCCESS CRITERIA
+# ============================================================================
+
+recovery_success:
+  criteria:
+    - "✅ GATE_R0 passed (environment healthy)"
+    - "✅ GATE_R1 passed (code audit complete, issues found)"
+    - "✅ GATE_R2 passed (automated repairs applied)"
+    - "✅ GATE_R3 passed (live system works with audio+video)"
+  
+  evidence_of_success:
+    - "outputs/audio/ contains multiple .wav files >5KB each"
+    - "Browser console shows audio=/audio/response_*.wav (not null)"
+    - "Video recording shows Alice speaking with audible voice"
+    - "No errors in outputs/logs/server_r3.log"
+  
+  next_steps:
+    - "Document what was broken and how it was fixed"
+    - "Update Phase 1 plan to include mandatory runtime testing"
+    - "Commit working code to git with tag 'v1.0-recovered'"
+    - "Resume normal development"
+
+# ============================================================================
+# LESSONS LEARNED (FOR GARAGE AGI)
+# ============================================================================
+
+garage_agi_insights:
+  problem: "Simulated Testing vs. Runtime Validation"
+  
+  why_it_failed:
+    - "Agent reasoned about expected outcomes instead of measuring"
+    - "No enforcement of actual command execution"
+    - "Trust but don't verify - assumed success"
+  
+  fix_for_future:
+    - "Mandate evidence-based validation (screenshots, log files)"
+    - "Every assertion must produce observable artifact"
+    - "Self-healing loops with retry limits"
+    - "Escalation protocol when automation fails"
+  
+  self_healing_principles:
+    1: "Detect - Runtime monitoring catches failures"
+    2: "Diagnose - Automated audits find root cause"
+    3: "Remediate - Apply surgical patches"
+    4: "Verify - Re-test on actual system"
+    5: "Escalate - Human intervention when stuck"
+  
+  garage_agi_core_module:
+    name: "RuntimeValidator"
+    purpose: "Enforce actual execution over simulated reasoning"
+    
+    components:
+      - "EvidenceCollector: Screenshots, logs, file listings"
+      - "AssertionExecutor: Runs actual commands, measures output"
+      - "SelfHealingEngine: Applies fixes, retries, escalates"
+      - "DiagnosticPackager: Bundles evidence for human review"
