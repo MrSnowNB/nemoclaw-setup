@@ -1,0 +1,44 @@
+# Emotion-to-Video Clip Mapping
+# Maps emotion_detector output states to video clip filenames
+
+emotion_mapping:
+  idle:
+    clip: "idle-loop.mp4"
+    should_loop: true
+    description: "Default rest state, continuous subtle movement"
+
+  listening:
+    clip: "reading-the-computer-screen.mp4"
+    should_loop: true
+    description: "User is typing or AI is thinking"
+
+  greeting:
+    clip: "it-is-great-to-see-you-again.mp4"
+    should_loop: false
+    description: "Welcome message, warm smile"
+
+  neutral_speaking:
+    clip: "speaking-neutral.mp4"
+    should_loop: false
+    description: "Standard response delivery"
+
+  friendly_speaking:
+    clip: "thats-wonderful-to-hear.mp4"
+    should_loop: false
+    description: "Positive, enthusiastic response"
+
+  empathetic:
+    clip: "concerned-deep-breath.mp4"
+    should_loop: false
+    description: "Reflective, supportive response"
+
+  farewell:
+    clip: "see-you-later.mp4"
+    should_loop: false
+    description: "Gentle closing gesture"
+
+# Fallback clip if emotion detection fails
+default_clip: "speaking-neutral.mp4"
+
+# Base path for video clips
+clips_directory: "data/video_clips"

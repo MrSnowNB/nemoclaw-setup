@@ -1,0 +1,74 @@
+# Alice in Cyberland - Video State Manifest
+# Maps chatbot states to video clip filenames
+
+character:
+  name: "Alice"
+  personality: "Lyra (curious, empathetic guide)"
+  version: "1.0.0"
+
+video_clips:
+  idle:
+    file: "idle-loop.mp4"
+    duration: 5
+    loop: true
+    has_audio: false
+    description: "Default rest state"
+  
+  greeting:
+    file: "it-is-great-to-see-you-again.mp4"
+    duration: 5
+    loop: false
+    has_audio: true
+    description: "Welcome user"
+  
+  listening:
+    file: "reading-computer-screen.mp4"
+    duration: 5
+    loop: true
+    has_audio: false
+    description: "User typing or speaking"
+  
+  neutral_speaking:
+    file: "speaking-neutral.mp4"
+    duration: 5
+    loop: false
+    has_audio: true
+    description: "Standard response delivery"
+  
+  friendly_speaking:
+    file: "thats-wonderful-to-hear.mp4"
+    duration: 5
+    loop: false
+    has_audio: true
+    description: "Positive, enthusiastic response"
+  
+  empathetic:
+    file: "concerned-deep-breath.mp4"
+    duration: 5
+    loop: false
+    has_audio: true
+    description: "Reflective, empathetic moment"
+  
+  farewell:
+    file: "see-you-later.mp4"
+    duration: 5
+    loop: false
+    has_audio: true
+    description: "Closing interaction"
+
+state_transitions:
+  default: "idle"
+  on_user_input: "listening"
+  on_ai_thinking: "listening"
+  on_positive_response: "friendly_speaking"
+  on_neutral_response: "neutral_speaking"
+  on_empathy_needed: "empathetic"
+  on_farewell: "farewell"
+  after_response: "idle"
+
+voice_settings:
+  current_model: "XTTS-v2 default"
+  sample_rate: 22050
+  language: "en"
+  replaceable: true
+  custom_voice_path: null  # Will be updated when voice actor audio available

@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alice in Cyberland Chat</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .chat-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            width: 100%;
+            max-width: 800px;
+            min-height: 600px;
+            backdrop-filter: blur(10px);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .video-container {
+            position: relative;
+            width: 100%;
+            height: 300px;
+            background: #f0f0f0;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 15px;
+        }
+
+        .chat-messages {
+            height: 200px;
+            overflow-y: auto;
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            border: 2px solid #e9ecef;
+        }
+
+        .message {
+            margin-bottom: 10px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            max-width: 80%;
+        }
+
+        .message.user {
+            background: #007bff;
+            color: white;
+            margin-left: auto;
+            text-align: right;
+        }
+
+        .message.alice {
+            background: #28a745;
+            color: white;
+        }
+
+        .message.system {
+            background: #6c757d;
+            color: white;
+            text-align: center;
+            font-size: 0.9em;
+        }
+
+        .input-area {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 2px solid #ddd;
+            border-radius: 25px;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        input:focus {
+            border-color: #007bff;
+        }
+
+        button {
+            padding: 12px 20px;
+            background: linear-gradient(45deg, #007bff, #0056b3);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .status {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .status.connected {
+            background: #28a745;
+            color: white;
+        }
+
+        .status.disconnected {
+            background: #dc3545;
+            color: white;
+        }
+
+        audio {
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            .chat-container {
+                margin: 20px;
+                padding: 20px;
+            }
+
+            .header h1 {
+                font-size: 2em;
+            }
+
+            .video-container {
+                height: 250px;
+            }
+
+            .chat-messages {
+                height: 150px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="header">
+            <h1>👋 Alice in Cyberland</h1>
+            <div class="status disconnected" id="connectionStatus">Offline</div>
+        </div>
+
+        <div class="video-container">
+            <video id="aliceVideo" muted></video>
+        </div>
+
+        <div class="chat-messages" id="messages"></div>
+
+        <div class="input-area">
+            <input type="text" id="messageInput" placeholder="Type or click 🎤 to speak..." onkeydown="handleEnter(event)">
+            <button onclick="sendMessage()">Send ✨</button>
+            <button id="microphoneButton" onclick="startSpeechRecognition()" title="Voice Input">🎤</button>
+            <button onclick="testAudio()" title="Test Audio Playback">🔊 Test</button>
+        </div>
+
+        <audio id="audioPlayer"></audio>
+    </div>
+
+    <script>
+        let websocket = null;
+        let currentVideoState = null;
+        let videoElement = null;
+        const messagesDiv = document.getElementById('messages');
+        const messageInput = document.getElementById('messageInput');
+        const connectionStatus = document.getElementById('connectionStatus');
+        const audioPlayer = document.getElementById('audioPlayer');
+
+        function initVideo() {
+            videoElement = document.getElementById('aliceVideo');
+        }
+
+        async function connectWebSocket() {
+            try {
+                websocket = new WebSocket('ws://localhost:8080/ws/chat');
+
+                websocket.onopen = function(event) {
+                    console.log('Connected to Alice');
+                    connectionStatus.textContent = 'Online';
+                    connectionStatus.className = 'status connected';
+                };
+
+                websocket.onmessage = function(event) {
+                    const data = JSON.parse(event.data);
+                    handleMessage(data);
+                };
+
+                websocket.onclose = function(event) {
+                    console.log('Disconnected from Alice');
+                    connectionStatus.textContent = 'Offline';
+                    connectionStatus.className = 'status disconnected';
+                };
+
+                websocket.onerror = function(error) {
+                    console.error('WebSocket error:', error);
+                    connectionStatus.textContent = 'Error';
+                    connectionStatus.className = 'status disconnected';
+                };
+
+            } catch (error) {
+                console.error('Connection error:', error);
+                connectionStatus.textContent = 'Error';
+                connectionStatus.className = 'status disconnected';
+            }
+        }
+
+        function handleMessage(data) {
+            switch(data.type) {
+                case 'ai_response':
+                    handleAliceResponse(data);  // RICo Phase 1: Handle new response format
+                    break;
+
+                case 'video_state':
+                    updateVideoState(data);
+                    break;
+
+                default:
+                    console.log('Unknown message type:', data);
+            }
+        }
+
+        async function handleAliceResponse(data) {
+            // RICo Phase 1: Direct video URL, not video_state
+            // data = { audio_url, video, text, duration }
+
+            // Add message to chat
+            displayMessage(data.text, 'alice');
+
+            // RICo Phase 1: Load duration-matched video directly
+            if (data.video) {
+                videoElement.src = data.video;
+                videoElement.loop = false;  // Backend created exact-duration clip
+                videoElement.muted = true;
+                console.log('📹 RICo video loaded:', data.video);
+
+                // Don't autoplay - wait for user interaction
+                // This prevents "media resource not suitable" errors
+            }
+
+            // Load and play audio - handle null/empty values gracefully
+            if (data.audio_url && data.audio_url !== null && data.audio_url !== 'null' && data.audio_url !== '') {
+                playAudio(data.audio_url);
+            } else {
+                console.log('⚠️  No audio available - attempting video only');
+                // If no audio but we have video, wait for user interaction then play video
+                if (data.video) {
+                    await playVideoOnInteraction();
+                }
+            }
+
+            console.log(`🎬 RICo Response: Video=${data.video}, Audio=${data.audio_url}, Duration=${data.duration ? data.duration.toFixed(1) : 'N/A'}s`);
+        }
+
+        function displayMessage(text, sender) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}`;
+            messageDiv.textContent = text;
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function updateVideoState(data) {
+            const state = data.video_state || data.state;
+            const videoDir = '/video';
+
+            // Map states to video files
+            const videoFiles = {
+                'idle': 'idle-loop.mp4',
+                'listening': 'reading-the-computer-screen.mp4',
+                'neutral_speaking': 'speaking-neutral.mp4',
+                'friendly_speaking': 'thats-wonderful-to-hear.mp4',
+                'empathetic': 'concerned-deep-breath.mp4',
+                'farewell': 'see-you-later.mp4',
+                'greeting': 'it-is-great-to-see-you-again.mp4'
+            };
+
+            const videoFile = videoFiles[state];
+            if (videoFile) {
+                videoElement.src = `${videoDir}/${videoFile}`;
+                videoElement.loop = data.loop || false;
+                // Don't auto-play - wait for user interaction
+                console.log(`Changed to state: ${state}, file: ${videoFile} (waiting for user interaction)`);
+            }
+        }
+
+        function sendMessage() {
+            const message = messageInput.value.trim();
+            if (message && websocket && websocket.readyState === WebSocket.OPEN) {
+                websocket.send(JSON.stringify({ message: message }));
+                displayMessage(message, 'user');
+                messageInput.value = '';
+            }
+        }
+
+        function handleEnter(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        async function playVideoOnInteraction() {
+            // Wait for user interaction then play video
+            console.log('📹 Waiting for user interaction to play video...');
+
+            const playVideoHandler = async function() {
+                try {
+                    // Play video and audio together after user interaction
+                    const videoPromise = videoElement.play();
+                    console.log('▶️ Video playing synchronously');
+
+                    await videoPromise;
+                    console.log('✅ Video playback started');
+
+                    // Return to idle loop when video ends
+                    videoElement.onended = () => {
+                        console.log('🛑 Video ended, returning to idle');
+                        updateVideoState({state: 'idle', loop: true});
+                    };
+
+                } catch (error) {
+                    console.log('❌ Video autoplay still blocked:', error.message);
+                }
+            };
+
+            // Attach to next user interaction (click anywhere)
+            document.addEventListener('click', playVideoHandler, { once: true });
+        }
+
+        async function playAudioVideo(audioUrl) {
+            // Play both audio and video after user interaction
+            console.log('🔊🎬 Attempting to play synchronized audio + video:', audioUrl);
+
+            const playSyncedMedia = async function() {
+                try {
+                    // Play both simultaneously after user interaction
+                    const [audioResult, videoResult] = await Promise.allSettled([
+                        audioPlayer.play(),
+                        videoElement.play()
+                    ]);
+
+                    if (audioResult.status === 'fulfilled') {
+                        console.log('✅ Audio playing successfully');
+                        removeManualPlayButton();
+
+                        // Return to idle when audio ends
+                        audioPlayer.onended = () => {
+                            console.log('🛑 Audio ended, returning to idle');
+                            updateVideoState({state: 'idle', loop: true});
+                        };
+                    } else {
+                        console.log('❌ Audio play failed:', audioResult.reason.message);
+                        addPlayButton(audioUrl);
+                    }
+
+                    if (videoResult.status === 'fulfilled') {
+                        console.log('✅ Video playing successfully');
+                    } else {
+                        console.log('❌ Video play failed:', videoResult.reason.message);
+                    }
+
+                } catch (e) {
+                    console.log('❌ Media play blocked:', e.message);
+                    addPlayButton(audioUrl);
+                }
+            };
+
+            // Wait for user interaction, then play synchronously
+            document.addEventListener('click', playSyncedMedia, { once: true });
+        }
+
+        function playAudio(audioUrl) {
+            if (audioUrl) {
+                console.log('🔊 Attempting to play audio:', audioUrl);
+                audioPlayer.src = audioUrl;
+
+                // Add event listeners for debugging
+                audioPlayer.onload = () => console.log('✅ Audio loaded successfully');
+                audioPlayer.oncanplay = () => console.log('✅ Audio ready to play');
+                audioPlayer.onplay = () => console.log('▶️ Audio started playing');
+                audioPlayer.onpause = () => console.log('⏸️ Audio paused');
+                audioPlayer.onended = () => console.log('🛑 Audio ended');
+                audioPlayer.onerror = (e) => console.error('❌ Audio load error:', e);
+
+                // Use new synchronized play function
+                playAudioVideo(audioUrl);
+            }
+        }
+
+        function addPlayButton(audioUrl) {
+            removeManualPlayButton(); // Remove any existing button first
+
+            const button = document.createElement('button');
+            button.id = 'manualPlayButton';
+            button.innerHTML = '🔊 Play Alice\'s Voice';
+            button.style.cssText = `
+                position: fixed;
+                top: 10px;
+                right: 10px;
+                padding: 10px 15px;
+                background: #dc3545;
+                color: white;
+                border: none;
+                border-radius: 25px;
+                cursor: pointer;
+                z-index: 1000;
+                font-weight: bold;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                animation: pulse 2s infinite;
+            `;
+            button.onclick = function() {
+                audioPlayer.play().then(() => {
+                    console.log('✅ Manual audio play started');
+                    removeManualPlayButton();
+                }).catch(e => {
+                    console.error('❌ Manual play also blocked:', e);
+                    button.innerHTML = '❌ Audio Blocked - Check Browser Settings';
+                    setTimeout(() => button.remove(), 3000);
+                });
+            };
+            document.body.appendChild(button);
+
+            // Auto-hide button after 30 seconds
+            setTimeout(() => {
+                if (button.parentNode) {
+                    button.remove();
+                }
+            }, 30000);
+        }
+
+        function removeManualPlayButton() {
+            const existingButton = document.getElementById('manualPlayButton');
+            if (existingButton) {
+                existingButton.remove();
+            }
+        }
+
+        // Add CSS for pulse animation
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes pulse {
+                0% { transform: scale(1); }
+                50% { transform: scale(1.05); }
+                100% { transform: scale(1); }
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Speech Recognition Variables
+        let recognition = null;
+        let isListening = false;
+        let speechTimeout = null;
+
+        function startSpeechRecognition() {
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                alert('Speech recognition not supported in this browser. Use Chrome or Edge.');
+                return;
+            }
+
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.lang = 'en-US';
+
+            recognition.onstart = function() {
+                isListening = true;
+                messageInput.value = '🎤 Listening...';
+                messageInput.disabled = true;
+                document.getElementById('microphoneButton').textContent = '⏹️';
+                document.getElementById('microphoneButton').onclick = stopSpeechRecognition;
+                console.log('Speech recognition started');
+
+                // Auto-stop after 10 seconds of silence
+                speechTimeout = setTimeout(() => {
+                    stopSpeechRecognition();
+                }, 10000);
+            };
+
+            recognition.onresult = function(event) {
+                clearTimeout(speechTimeout);
+                const transcript = event.results[0][0].transcript;
+                messageInput.value = transcript;
+                messageInput.disabled = false;
+                document.getElementById('microphoneButton').textContent = '🎤';
+                document.getElementById('microphoneButton').onclick = startSpeechRecognition;
+                isListening = false;
+
+                console.log('Speech recognized:', transcript);
+
+                // Auto-send the message
+                if (transcript.trim()) {
+                    setTimeout(() => sendMessage(), 500);
+                }
+            };
+
+            recognition.onerror = function(event) {
+                clearTimeout(speechTimeout);
+                console.error('Speech recognition error:', event.error);
+                messageInput.value = '❌ Speech recognition error: ' + event.error;
+                messageInput.disabled = false;
+                document.getElementById('microphoneButton').textContent = '🎤';
+                document.getElementById('microphoneButton').onclick = startSpeechRecognition;
+                isListening = false;
+            };
+
+            recognition.onend = function() {
+                clearTimeout(speechTimeout);
+                isListening = false;
+                if (!messageInput.disabled) {
+                    messageInput.value = '';
+                }
+                document.getElementById('microphoneButton').textContent = '🎤';
+                document.getElementById('microphoneButton').onclick = startSpeechRecognition;
+                console.log('Speech recognition ended');
+            };
+
+            try {
+                recognition.start();
+            } catch (e) {
+                console.error('Failed to start speech recognition:', e);
+                messageInput.value = '❌ Could not access microphone';
+                messageInput.disabled = false;
+            }
+        }
+
+        function stopSpeechRecognition() {
+            if (recognition && isListening) {
+                recognition.stop();
+            }
+        }
+
+        function testAudio() {
+            // Simply send a test message - this will generate new audio and test the full flow
+            if (websocket && websocket.readyState === WebSocket.OPEN) {
+                console.log('🎵 Testing full audio flow by sending message to Alice...');
+                websocket.send(JSON.stringify({ message: "Hello Alice, can you test your voice for me?" }));
+                displayMessage("Hello Alice, can you test your voice for me?", 'user');
+                console.log('✅ Test message sent - Alice should respond with voice and video');
+            } else {
+                console.log('❌ Cannot test - WebSocket not connected to Alice');
+                alert('Please refresh the page - Alice is not connected');
+            }
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            initVideo();
+            connectWebSocket();
+        });
+
+        // Auto-connect on page focus
+        window.addEventListener('focus', function() {
+            if (!websocket || websocket.readyState !== WebSocket.OPEN) {
+                connectWebSocket();
+            }
+        });
+    </script>
+</body>
+</html>

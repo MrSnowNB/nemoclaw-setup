@@ -1,0 +1,289 @@
+test_timestamp: '2025-11-06T09:38:14.517212'
+phoneme_mapping_tests:
+  Basic Vowels:
+    text: She ate ice cream
+    phonemes:
+    - phoneme: SH
+      start: 0.0
+      end: 0.1
+    - phoneme: IY
+      start: 0.1
+      end: 0.3
+    - phoneme: EY
+      start: 0.4
+      end: 0.6
+    - phoneme: T
+      start: 0.6
+      end: 0.7
+    - phoneme: AY
+      start: 0.8
+      end: 1.0
+    - phoneme: S
+      start: 1.0
+      end: 1.1
+    - phoneme: K
+      start: 1.1
+      end: 1.2
+    - phoneme: R
+      start: 1.2
+      end: 1.3
+    - phoneme: IY
+      start: 1.3
+      end: 1.5
+    - phoneme: M
+      start: 1.5
+      end: 1.6
+    visemes:
+    - viseme: IH
+      start: 0.0
+      end: 0.1
+      duration: 0.1
+    - viseme: IY
+      start: 0.1
+      end: 0.3
+      duration: 0.19999999999999998
+    - viseme: EY
+      start: 0.4
+      end: 0.6
+      duration: 0.19999999999999996
+    - viseme: UH
+      start: 0.6
+      end: 0.7
+      duration: 0.09999999999999998
+    - viseme: AY
+      start: 0.8
+      end: 1.0
+      duration: 0.19999999999999996
+    - viseme: IH
+      start: 1.0
+      end: 1.1
+      duration: 0.10000000000000009
+    - viseme: UH
+      start: 1.1
+      end: 1.2
+      duration: 0.09999999999999987
+    - viseme: ER
+      start: 1.2
+      end: 1.3
+      duration: 0.10000000000000009
+    - viseme: IY
+      start: 1.3
+      end: 1.5
+      duration: 0.19999999999999996
+    - viseme: UH
+      start: 1.5
+      end: 1.6
+      duration: 0.10000000000000009
+    validation_passed: true
+  Consonants:
+    text: The quick brown fox
+    phonemes:
+    - phoneme: DH
+      start: 0.0
+      end: 0.1
+    - phoneme: AH
+      start: 0.1
+      end: 0.2
+    - phoneme: K
+      start: 0.3
+      end: 0.4
+    - phoneme: W
+      start: 0.4
+      end: 0.5
+    - phoneme: IH
+      start: 0.5
+      end: 0.6
+    - phoneme: K
+      start: 0.6
+      end: 0.7
+    - phoneme: B
+      start: 0.8
+      end: 0.9
+    - phoneme: R
+      start: 0.9
+      end: 1.0
+    - phoneme: AW
+      start: 1.0
+      end: 1.2
+    - phoneme: N
+      start: 1.2
+      end: 1.3
+    - phoneme: F
+      start: 1.4
+      end: 1.5
+    - phoneme: AA
+      start: 1.5
+      end: 1.7
+    - phoneme: K
+      start: 1.7
+      end: 1.8
+    - phoneme: S
+      start: 1.8
+      end: 1.9
+    visemes:
+    - viseme: AH
+      start: 0.0
+      end: 0.1
+      duration: 0.1
+    - viseme: AH
+      start: 0.1
+      end: 0.2
+      duration: 0.1
+    - viseme: UH
+      start: 0.3
+      end: 0.4
+      duration: 0.10000000000000003
+    - viseme: UW
+      start: 0.4
+      end: 0.5
+      duration: 0.09999999999999998
+    - viseme: IH
+      start: 0.5
+      end: 0.6
+      duration: 0.09999999999999998
+    - viseme: UH
+      start: 0.6
+      end: 0.7
+      duration: 0.09999999999999998
+    - viseme: UH
+      start: 0.8
+      end: 0.9
+      duration: 0.09999999999999998
+    - viseme: ER
+      start: 0.9
+      end: 1.0
+      duration: 0.09999999999999998
+    - viseme: AW
+      start: 1.0
+      end: 1.2
+      duration: 0.19999999999999996
+    - viseme: AH
+      start: 1.2
+      end: 1.3
+      duration: 0.10000000000000009
+    - viseme: UH
+      start: 1.4
+      end: 1.5
+      duration: 0.10000000000000009
+    - viseme: AA
+      start: 1.5
+      end: 1.7
+      duration: 0.19999999999999996
+    - viseme: UH
+      start: 1.7
+      end: 1.8
+      duration: 0.10000000000000009
+    - viseme: IH
+      start: 1.8
+      end: 1.9
+      duration: 0.09999999999999987
+    validation_passed: true
+  Diphthongs:
+    text: How now brown cow
+    phonemes:
+    - phoneme: HH
+      start: 0.0
+      end: 0.1
+    - phoneme: AW
+      start: 0.1
+      end: 0.3
+    - phoneme: N
+      start: 0.4
+      end: 0.5
+    - phoneme: AW
+      start: 0.5
+      end: 0.7
+    - phoneme: B
+      start: 0.8
+      end: 0.9
+    - phoneme: R
+      start: 0.9
+      end: 1.0
+    - phoneme: AW
+      start: 1.0
+      end: 1.2
+    - phoneme: N
+      start: 1.2
+      end: 1.3
+    - phoneme: K
+      start: 1.4
+      end: 1.5
+    - phoneme: AW
+      start: 1.5
+      end: 1.7
+    visemes:
+    - viseme: UH
+      start: 0.0
+      end: 0.1
+      duration: 0.1
+    - viseme: AW
+      start: 0.1
+      end: 0.3
+      duration: 0.19999999999999998
+    - viseme: AH
+      start: 0.4
+      end: 0.5
+      duration: 0.09999999999999998
+    - viseme: AW
+      start: 0.5
+      end: 0.7
+      duration: 0.19999999999999996
+    - viseme: UH
+      start: 0.8
+      end: 0.9
+      duration: 0.09999999999999998
+    - viseme: ER
+      start: 0.9
+      end: 1.0
+      duration: 0.09999999999999998
+    - viseme: AW
+      start: 1.0
+      end: 1.2
+      duration: 0.19999999999999996
+    - viseme: AH
+      start: 1.2
+      end: 1.3
+      duration: 0.10000000000000009
+    - viseme: UH
+      start: 1.4
+      end: 1.5
+      duration: 0.10000000000000009
+    - viseme: AW
+      start: 1.5
+      end: 1.7
+      duration: 0.19999999999999996
+    validation_passed: true
+edge_case_tests:
+  Empty Input:
+    input: ''
+    viseme_count: 0
+    validation_passed: true
+    error: null
+  Whitespace Only:
+    input: '   '
+    viseme_count: 0
+    validation_passed: true
+    error: null
+  Non-English Characters:
+    input: "Hello \u4E16\u754C \U0001F30D"
+    viseme_count: 2
+    validation_passed: true
+    error: null
+  Numbers and Symbols:
+    input: Test 123!@#
+    viseme_count: 2
+    validation_passed: true
+    error: null
+  Very Long Text:
+    input: This is a very long sentence that should test the limits of our text processing
+      capabilities and ensure that the system can handle extended input without any
+      issues or performance degradation.
+    viseme_count: 31
+    validation_passed: true
+    error: null
+summary:
+  total_test_cases: 8
+  phoneme_tests: 3
+  edge_tests: 5
+  all_mappings_logged: true
+  exceptions_logged: true

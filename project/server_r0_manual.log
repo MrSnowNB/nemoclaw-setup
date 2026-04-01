@@ -1,0 +1,24 @@
+INFO:     Will watch for changes in these directories: ['/home/mr-snow/Documents/Testing the Beast/Alice in Cyberland']
+INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
+INFO:     Started reloader process [207057] using WatchFiles
+INFO:src.video_duration_matcher:.2f
+INFO:src.video_duration_matcher:.2f
+INFO:src.video_duration_matcher:.2f
+INFO:src.video_duration_matcher:.2f
+INFO:src.video_duration_matcher:.2f
+INFO:src.video_duration_matcher:.2f
+INFO:src.video_duration_matcher:.2f
+INFO:src.video_duration_matcher:📹 VideoDurationMatcher initialized with 7 clips
+INFO:     Started server process [207060]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+🔊 Initializing pyttsx3 TTS engine...
+✅ pyttsx3 engine initialized successfully
+Using default voice
+✅ TTS engine fully configured (rate: 180 WPM)
+INFO:     127.0.0.1:40018 - "GET / HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [207060]
+INFO:     Stopping reloader process [207057]

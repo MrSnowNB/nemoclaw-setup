@@ -1,0 +1,1016 @@
+# PHASE 1: EMOTION-SYNCHRONIZED DURATION-MATCHED VIDEO LOOPS
+# AI-First Implementation Plan for Coding Agent
+# Project: RICo (Region of Interest Codec) - Alice in Cyberland POC
+# Version: 1.0.0 - Gated Validation Protocol
+# Date: 2025-11-03
+
+# ============================================================================
+# PHASE 1 OVERVIEW
+# ============================================================================
+
+phase_1_objective: |
+  Implement sentiment-driven video clip selection with duration-matched looping
+  to synchronize emotional avatar states with TTS audio responses.
+  
+  This phase proves the core RICo concept: emotion-aware video state management
+  with precise temporal control, forming the foundation for patent claims.
+
+phase_1_scope:
+  includes:
+    - Sentiment analysis integration with existing emotion detector
+    - TTS audio duration measurement
+    - Video clip duration matching via FFmpeg looping
+    - Synchronized audio-video playback
+    - State-based video loop control (idle/listening loop, responses play once)
+  
+  excludes:
+    - Real-time mouth ROI replacement (Phase 2)
+    - Phoneme-level lip sync (Phase 2)
+    - Eye tracking and gaze control (Phase 3)
+  
+  success_criteria:
+    - User can chat with Alice and see emotion-appropriate video clips
+    - Video clips loop to exactly match TTS audio duration
+    - Audio-video sync drift <100ms
+    - Smooth transitions between emotional states
+    - Returns to idle loop after response completes
+    - Zero crashes during 5-minute conversation test
+
+  deliverables:
+    - Working sentiment → video → looping pipeline
+    - Performance metrics (latency, sync accuracy)
+    - Documentation for patent filing
+    - Screen recording demo for investors
+
+# ============================================================================
+# PROJECT STRUCTURE
+# ============================================================================
+
+project_structure: |
+  uncanny-valley/
+  ├── data/
+  │   ├── video_clips/
+  │   │   ├── idle-loop.mp4                    # 6s, loops
+  │   │   ├── it-is-great-to-see-you-again.mp4 # 6s, greeting
+  │   │   ├── reading-the-computer-screen.mp4  # 6s, listening
+  │   │   ├── speaking-nuetral.mp4             # 6s, neutral
+  │   │   ├── thats-wonderful-to-hear.mp4      # 6s, friendly
+  │   │   ├── concerned-deep-breath.mp4        # 6s, empathetic
+  │   │   └── see-you-later.mp4                # 6s, farewell
+  │   └── emotion_config.yaml                  # NEW: emotion-to-clip mapping
+  ├── src/
+  │   ├── chat_server.py                       # EXISTING: FastAPI server
+  │   ├── emotion_detector.py                  # EXISTING: sentiment analysis
+  │   ├── video_duration_matcher.py            # NEW: duration matching module
+  │   └── tts_engine.py                        # EXISTING: pyttsx3 (to be upgraded)
+  ├── templates/
+  │   └── index.html                           # UPDATE: video playback logic
+  ├── outputs/
+  │   ├── audio/                               # TTS-generated audio
+  │   ├── video/                               # Duration-matched video clips
+  │   └── logs/                                # Performance metrics
+  ├── tests/
+  │   └── phase1_validation.py                 # NEW: automated gate tests
+  └── requirements.txt                         # UPDATE: add new dependencies
+
+# ============================================================================
+# TASK BREAKDOWN WITH GATES
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# TASK 1: ENVIRONMENT PREPARATION
+# ----------------------------------------------------------------------------
+
+task_1:
+  id: "T1"
+  name: "Install Dependencies and Verify Existing System"
+  priority: "critical"
+  estimated_time: "30 minutes"
+  dependencies: []
+  
+  steps:
+    - step_id: "T1.1"
+      action: "Verify existing project structure"
+      commands:
+        - "cd ~/uncanny-valley"
+        - "ls -la data/video_clips/*.mp4 | wc -l"  # Should be 7
+        - "test -f src/chat_server.py && echo 'Server exists'"
+        - "test -f src/emotion_detector.py && echo 'Emotion detector exists'"
+      validation:
+        - "7 video clips present in data/video_clips/"
+        - "chat_server.py exists"
+        - "emotion_detector.py exists"
+      on_failure:
+        action: "escalate"
+        message: "Missing required files. Cannot proceed."
+    
+    - step_id: "T1.2"
+      action: "Install new Python dependencies"
+      commands:
+        - "pip install librosa==0.10.1"          # Audio duration measurement
+        - "pip install ffmpeg-python==0.2.0"     # Video processing
+        - "pip install pyyaml==6.0.1"            # Config file parsing
+      validation:
+        - "python -c 'import librosa; import ffmpeg; import yaml'"
+      on_failure:
+        action: "retry"
+        max_retries: 2
+        escalate_if_failed: true
+    
+    - step_id: "T1.3"
+      action: "Verify FFmpeg system binary"
+      commands:
+        - "which ffmpeg"
+        - "ffmpeg -version | head -1"
+      validation:
+        - "FFmpeg version 4.0+ detected"
+      on_failure:
+        action: "install"
+        install_commands:
+          ubuntu: "sudo apt-get install ffmpeg"
+          mac: "brew install ffmpeg"
+          windows: "Download from https://ffmpeg.org/download.html"
+  
+  gate: "GATE_1"
+  gate_validation:
+    - assertion: "All dependencies installed"
+      test: "python -c 'import librosa, ffmpeg, yaml'"
+      criticality: "critical"
+    
+    - assertion: "FFmpeg accessible"
+      test: "ffmpeg -version > /dev/null 2>&1"
+      criticality: "critical"
+    
+    - assertion: "All 7 video clips present"
+      test: "[ $(ls -1 data/video_clips/*.mp4 | wc -l) -eq 7 ]"
+      criticality: "critical"
+  
+  on_gate_pass:
+    - "Log success to outputs/logs/gate_1_passed.txt"
+    - "Proceed to Task 2"
+  
+  on_gate_fail:
+    - "Log failure details to outputs/logs/gate_1_failed.txt"
+    - "Halt execution and request human intervention"
+
+# ----------------------------------------------------------------------------
+# TASK 2: CREATE EMOTION CONFIGURATION
+# ----------------------------------------------------------------------------
+
+task_2:
+  id: "T2"
+  name: "Create Emotion-to-Clip Mapping Configuration"
+  priority: "high"
+  estimated_time: "15 minutes"
+  dependencies: ["T1"]
+  
+  steps:
+    - step_id: "T2.1"
+      action: "Create emotion_config.yaml"
+      file_to_create: "data/emotion_config.yaml"
+      content: |
+        # Emotion-to-Video Clip Mapping
+        # Maps emotion_detector output states to video clip filenames
+        
+        emotion_mapping:
+          idle:
+            clip: "idle-loop.mp4"
+            should_loop: true
+            description: "Default rest state, continuous subtle movement"
+          
+          listening:
+            clip: "reading-the-computer-screen.mp4"
+            should_loop: true
+            description: "User is typing or AI is thinking"
+          
+          greeting:
+            clip: "it-is-great-to-see-you-again.mp4"
+            should_loop: false
+            description: "Welcome message, warm smile"
+          
+          neutral_speaking:
+            clip: "speaking-nuetral.mp4"
+            should_loop: false
+            description: "Standard response delivery"
+          
+          friendly_speaking:
+            clip: "thats-wonderful-to-hear.mp4"
+            should_loop: false
+            description: "Positive, enthusiastic response"
+          
+          empathetic:
+            clip: "concerned-deep-breath.mp4"
+            should_loop: false
+            description: "Reflective, supportive response"
+          
+          farewell:
+            clip: "see-you-later.mp4"
+            should_loop: false
+            description: "Gentle closing gesture"
+        
+        # Fallback clip if emotion detection fails
+        default_clip: "speaking-nuetral.mp4"
+        
+        # Base path for video clips
+        clips_directory: "data/video_clips"
+      
+      validation:
+        - "test -f data/emotion_config.yaml"
+      on_failure:
+        action: "retry"
+        max_retries: 1
+    
+    - step_id: "T2.2"
+      action: "Validate YAML syntax"
+      commands:
+        - "python -c 'import yaml; yaml.safe_load(open(\"data/emotion_config.yaml\"))'"
+      validation:
+        - "Exit code is 0"
+      on_failure:
+        action: "escalate"
+        message: "YAML syntax error in emotion_config.yaml"
+  
+  gate: "GATE_2"
+  gate_validation:
+    - assertion: "Config file exists"
+      test: "test -f data/emotion_config.yaml"
+      criticality: "critical"
+    
+    - assertion: "YAML is valid"
+      test: "python -c 'import yaml; yaml.safe_load(open(\"data/emotion_config.yaml\"))'"
+      criticality: "critical"
+    
+    - assertion: "All 7 emotions mapped"
+      test: "grep -c 'clip:' data/emotion_config.yaml | grep 7"
+      criticality: "high"
+  
+  on_gate_pass:
+    - "Log to outputs/logs/gate_2_passed.txt"
+    - "Proceed to Task 3"
+
+# ----------------------------------------------------------------------------
+# TASK 3: CREATE VIDEO DURATION MATCHER MODULE
+# ----------------------------------------------------------------------------
+
+task_3:
+  id: "T3"
+  name: "Implement Video Duration Matching Engine"
+  priority: "critical"
+  estimated_time: "2 hours"
+  dependencies: ["T2"]
+  
+  steps:
+    - step_id: "T3.1"
+      action: "Create video_duration_matcher.py module"
+      file_to_create: "src/video_duration_matcher.py"
+      content: |
+        """
+        Video Duration Matcher for RICo Phase 1
+        
+        Extends 6-second emotional video clips to match TTS audio duration
+        via FFmpeg-based controlled looping.
+        """
+        
+        import subprocess
+        import json
+        import uuid
+        import os
+        from pathlib import Path
+        import yaml
+        import logging
+        
+        logging.basicConfig(level=logging.INFO)
+        logger = logging.getLogger(__name__)
+        
+        class VideoDurationMatcher:
+            """Matches video clip duration to audio duration via looping"""
+            
+            def __init__(self, config_path="data/emotion_config.yaml"):
+                """Initialize with emotion configuration"""
+                self.config = self._load_config(config_path)
+                self.clips_dir = Path(self.config['clips_directory'])
+                self.clip_durations = self._measure_all_clip_durations()
+                
+                # Create output directory
+                self.output_dir = Path("outputs/video")
+                self.output_dir.mkdir(parents=True, exist_ok=True)
+                
+                logger.info(f"📹 VideoDurationMatcher initialized with {len(self.clip_durations)} clips")
+            
+            def _load_config(self, config_path):
+                """Load emotion-to-clip mapping config"""
+                with open(config_path, 'r') as f:
+                    return yaml.safe_load(f)
+            
+            def _measure_all_clip_durations(self):
+                """Measure duration of all video clips using FFprobe"""
+                durations = {}
+                
+                for clip_file in self.clips_dir.glob("*.mp4"):
+                    try:
+                        duration = self._get_video_duration(clip_file)
+                        durations[clip_file.name] = duration
+                        logger.info(f"  ✓ {clip_file.name}: {duration:.2f}s")
+                    except Exception as e:
+                        logger.error(f"  ✗ Failed to measure {clip_file.name}: {e}")
+                
+                return durations
+            
+            def _get_video_duration(self, video_path):
+                """Get duration of a video file using FFprobe"""
+                cmd = [
+                    "ffprobe",
+                    "-v", "error",
+                    "-show_entries", "format=duration",
+                    "-of", "json",
+                    str(video_path)
+                ]
+                
+                result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+                data = json.loads(result.stdout)
+                return float(data['format']['duration'])
+            
+            def create_duration_matched_clip(self, emotion_state, target_duration):
+                """
+                Create a video clip that matches target audio duration
+                
+                Args:
+                    emotion_state: Emotion key from emotion_config.yaml
+                    target_duration: Duration in seconds to match
+                
+                Returns:
+                    Path to generated video file
+                """
+                # Get clip info from config
+                emotion_data = self.config['emotion_mapping'].get(
+                    emotion_state,
+                    {'clip': self.config['default_clip'], 'should_loop': False}
+                )
+                
+                clip_name = emotion_data['clip']
+                clip_path = self.clips_dir / clip_name
+                
+                if not clip_path.exists():
+                    raise FileNotFoundError(f"Video clip not found: {clip_path}")
+                
+                # Get original clip duration
+                original_duration = self.clip_durations.get(clip_name)
+                if not original_duration:
+                    original_duration = self._get_video_duration(clip_path)
+                
+                # Generate output filename
+                output_filename = f"{emotion_state}_{uuid.uuid4().hex[:8]}.mp4"
+                output_path = self.output_dir / output_filename
+                
+                # Calculate how many loops needed
+                if target_duration <= original_duration:
+                    # Audio is shorter than clip - just trim the clip
+                    loop_count = 0
+                else:
+                    # Audio is longer - need to loop
+                    loop_count = int(target_duration / original_duration)
+                
+                logger.info(f"🎬 Creating {emotion_state} clip: {original_duration:.1f}s → {target_duration:.1f}s (loops: {loop_count})")
+                
+                # Build FFmpeg command
+                if loop_count == 0:
+                    # Just trim to exact duration
+                    cmd = [
+                        "ffmpeg", "-y",
+                        "-i", str(clip_path),
+                        "-t", str(target_duration),
+                        "-c", "copy",
+                        str(output_path)
+                    ]
+                else:
+                    # Loop and trim to exact duration
+                    cmd = [
+                        "ffmpeg", "-y",
+                        "-stream_loop", str(loop_count),
+                        "-i", str(clip_path),
+                        "-t", str(target_duration),
+                        "-c:v", "libx264",        # Re-encode for smooth looping
+                        "-preset", "fast",        # Fast encoding
+                        "-crf", "23",             # Quality setting
+                        "-c:a", "aac",            # Audio codec
+                        "-b:a", "128k",           # Audio bitrate
+                        str(output_path)
+                    ]
+                
+                # Execute FFmpeg
+                try:
+                    subprocess.run(
+                        cmd,
+                        check=True,
+                        capture_output=True,
+                        text=True
+                    )
+                    
+                    # Verify output
+                    actual_duration = self._get_video_duration(output_path)
+                    drift = abs(actual_duration - target_duration)
+                    
+                    if drift > 0.1:  # Allow 100ms tolerance
+                        logger.warning(f"⚠️  Duration drift: {drift:.3f}s (target: {target_duration:.1f}s, actual: {actual_duration:.1f}s)")
+                    else:
+                        logger.info(f"✅ Duration match: {actual_duration:.1f}s (drift: {drift*1000:.0f}ms)")
+                    
+                    return output_path
+                    
+                except subprocess.CalledProcessError as e:
+                    logger.error(f"❌ FFmpeg error: {e.stderr}")
+                    raise
+            
+            def get_clip_for_emotion(self, emotion_state):
+                """Get the clip filename for a given emotion state"""
+                emotion_data = self.config['emotion_mapping'].get(
+                    emotion_state,
+                    {'clip': self.config['default_clip']}
+                )
+                return emotion_data['clip']
+        
+        # Test function
+        if __name__ == "__main__":
+            matcher = VideoDurationMatcher()
+            
+            # Test creating a 10-second friendly clip
+            test_output = matcher.create_duration_matched_clip('friendly_speaking', 10.0)
+            print(f"✅ Test output: {test_output}")
+      
+      validation:
+        - "test -f src/video_duration_matcher.py"
+      on_failure:
+        action: "retry"
+        max_retries: 1
+    
+    - step_id: "T3.2"
+      action: "Test VideoDurationMatcher standalone"
+      commands:
+        - "cd ~/uncanny-valley"
+        - "python src/video_duration_matcher.py"
+      validation:
+        - "Exit code is 0"
+        - "Output file created in outputs/video/"
+      on_failure:
+        action: "check_troubleshooting"
+        error_id: "ERR_VIDEO_DURATION_TEST"
+  
+  gate: "GATE_3"
+  gate_validation:
+    - assertion: "Module created"
+      test: "test -f src/video_duration_matcher.py"
+      criticality: "critical"
+    
+    - assertion: "Module imports successfully"
+      test: "python -c 'from src.video_duration_matcher import VideoDurationMatcher'"
+      criticality: "critical"
+    
+    - assertion: "Test video generated"
+      test: "[ $(ls -1 outputs/video/*.mp4 2>/dev/null | wc -l) -gt 0 ]"
+      criticality: "critical"
+    
+    - assertion: "Test video duration accurate"
+      test: "python -c 'from src.video_duration_matcher import VideoDurationMatcher; m = VideoDurationMatcher(); d = m._get_video_duration(list(m.output_dir.glob(\"*.mp4\"))[0]); assert 9.8 < d < 10.2, f\"Duration {d} not ~10s\"'"
+      criticality: "high"
+  
+  on_gate_pass:
+    - "Log to outputs/logs/gate_3_passed.txt"
+    - "Proceed to Task 4"
+
+# ----------------------------------------------------------------------------
+# TASK 4: INTEGRATE WITH CHAT SERVER
+# ----------------------------------------------------------------------------
+
+task_4:
+  id: "T4"
+  name: "Integrate Duration Matching with Chat Backend"
+  priority: "critical"
+  estimated_time: "90 minutes"
+  dependencies: ["T3"]
+  
+  steps:
+    - step_id: "T4.1"
+      action: "Add audio duration measurement to chat server"
+      file_to_update: "src/chat_server.py"
+      changes:
+        - description: "Import librosa for audio duration"
+          add_after_line: "import os"
+          code: |
+            import librosa  # Audio duration measurement
+            from src.video_duration_matcher import VideoDurationMatcher
+        
+        - description: "Initialize VideoDurationMatcher in server"
+          add_after_line: "# Initialize components"
+          code: |
+            video_matcher = VideoDurationMatcher()
+        
+        - description: "Update WebSocket response handler"
+          find_function: "websocket_chat"
+          modify: |
+            # After TTS generates audio:
+            audio_path = tts_engine.synthesize(ai_response)
+            
+            # NEW: Measure audio duration
+            audio_duration = librosa.get_duration(filename=audio_path)
+            
+            # NEW: Create duration-matched video
+            video_path = video_matcher.create_duration_matched_clip(
+                emotion_state=detected_emotion,
+                target_duration=audio_duration
+            )
+            
+            # Send response with video URL
+            await websocket.send_json({
+                "type": "response",
+                "state": detected_emotion,
+                "video": f"/video/{os.path.basename(video_path)}",
+                "audio": f"/audio/{os.path.basename(audio_path)}",
+                "text": ai_response,
+                "duration": audio_duration
+            })
+      
+      validation:
+        - "python -c 'from src.chat_server import app'"
+      on_failure:
+        action: "check_troubleshooting"
+        error_id: "ERR_SERVER_INTEGRATION"
+    
+    - step_id: "T4.2"
+      action: "Add video serving endpoint"
+      file_to_update: "src/chat_server.py"
+      add_endpoint: |
+        @app.get("/video/{filename}")
+        async def serve_video(filename: str):
+            """Serve generated video files"""
+            video_path = Path("outputs/video") / filename
+            if video_path.exists():
+                return FileResponse(video_path, media_type="video/mp4")
+            return JSONResponse({"error": "Video not found"}, status_code=404)
+      
+      validation:
+        - "grep -q '/video/{filename}' src/chat_server.py"
+      on_failure:
+        action: "retry"
+        max_retries: 1
+  
+  gate: "GATE_4"
+  gate_validation:
+    - assertion: "Server imports updated modules"
+      test: "python -c 'from src.chat_server import app, video_matcher'"
+      criticality: "critical"
+    
+    - assertion: "Video endpoint added"
+      test: "grep -q 'serve_video' src/chat_server.py"
+      criticality: "critical"
+    
+    - assertion: "Server starts without errors"
+      test: "timeout 5 python -m uvicorn src.chat_server:app --port 8081 > /dev/null 2>&1 &"
+      criticality: "high"
+  
+  on_gate_pass:
+    - "Log to outputs/logs/gate_4_passed.txt"
+    - "Proceed to Task 5"
+
+# ----------------------------------------------------------------------------
+# TASK 5: UPDATE FRONTEND VIDEO PLAYBACK
+# ----------------------------------------------------------------------------
+
+task_5:
+  id: "T5"
+  name: "Update Frontend for Duration-Matched Playback"
+  priority: "critical"
+  estimated_time: "60 minutes"
+  dependencies: ["T4"]
+  
+  steps:
+    - step_id: "T5.1"
+      action: "Update handleAliceResponse function"
+      file_to_update: "templates/index.html"
+      find_and_replace:
+        old_code: |
+          async function handleAliceResponse(data) {
+              // Change video to speaking state
+              changeVideoState(data.state, data.video);
+              
+              // Add message to chat
+              addMessage('alice', data.text);
+              
+              // Play audio with slight delay
+              setTimeout(() => {
+                  audio.src = data.audio;
+                  audio.play();
+              }, 50);
+              
+              // Return to idle after audio ends
+              audio.onended = () => {
+                  changeVideoState('idle', 'idle-loop.mp4');
+                  isProcessing = false;
+                  sendBtn.disabled = false;
+              };
+          }
+        
+        new_code: |
+          async function handleAliceResponse(data) {
+              // data = { state, video, audio, text, duration }
+              
+              // Add message to chat
+              addMessage('alice', data.text);
+              
+              // Load duration-matched video (already looped to correct length)
+              video.src = data.video;
+              video.loop = false;  // Backend created exact-duration clip
+              video.muted = true;
+              
+              // Load audio
+              audio.src = data.audio;
+              
+              console.log(`🎬 Playing ${data.state}: ${data.duration.toFixed(1)}s`);
+              
+              // Play both simultaneously
+              try {
+                  await Promise.all([
+                      video.play(),
+                      audio.play()
+                  ]);
+              } catch (err) {
+                  console.error('Playback error:', err);
+              }
+              
+              // When audio ends, return to idle
+              audio.onended = () => {
+                  console.log('🔊 Audio ended, returning to idle');
+                  video.src = '/static/video_clips/idle-loop.mp4';
+                  video.loop = true;
+                  video.play();
+                  isProcessing = false;
+                  sendBtn.disabled = false;
+              };
+          }
+      
+      validation:
+        - "grep -q 'video.loop = false' templates/index.html"
+        - "grep -q 'Promise.all' templates/index.html"
+      on_failure:
+        action: "check_troubleshooting"
+        error_id: "ERR_FRONTEND_UPDATE"
+    
+    - step_id: "T5.2"
+      action: "Ensure idle/listening states still loop"
+      file_to_update: "templates/index.html"
+      verify_exists: |
+        function changeVideoState(state, videoFile) {
+            const loopingStates = ['idle', 'listening'];
+            const shouldLoop = loopingStates.includes(state);
+            
+            video.src = `/static/video_clips/${videoFile}`;
+            video.loop = shouldLoop;
+            video.muted = true;
+            video.play();
+        }
+      
+      validation:
+        - "grep -q 'loopingStates' templates/index.html"
+      on_failure:
+        action: "escalate"
+        message: "changeVideoState function missing or incorrect"
+  
+  gate: "GATE_5"
+  gate_validation:
+    - assertion: "Frontend updated with new playback logic"
+      test: "grep -q 'Promise.all' templates/index.html"
+      criticality: "critical"
+    
+    - assertion: "Idle/listening loop logic preserved"
+      test: "grep -q 'loopingStates' templates/index.html"
+      criticality: "high"
+  
+  on_gate_pass:
+    - "Log to outputs/logs/gate_5_passed.txt"
+    - "Proceed to Task 6"
+
+# ----------------------------------------------------------------------------
+# TASK 6: END-TO-END INTEGRATION TEST
+# ----------------------------------------------------------------------------
+
+task_6:
+  id: "T6"
+  name: "End-to-End System Integration Test"
+  priority: "critical"
+  estimated_time: "30 minutes"
+  dependencies: ["T5"]
+  
+  steps:
+    - step_id: "T6.1"
+      action: "Start server and open browser"
+      commands:
+        - "python -m uvicorn src.chat_server:app --host 0.0.0.0 --port 8080 --reload &"
+        - "sleep 3"  # Wait for server startup
+        - "curl -s http://localhost:8080/health | grep -q 'healthy'"
+      validation:
+        - "Server responds to health check"
+      on_failure:
+        action: "check_troubleshooting"
+        error_id: "ERR_SERVER_START"
+    
+    - step_id: "T6.2"
+      action: "Manual test scenarios"
+      test_scenarios:
+        - scenario: "Greeting flow"
+          steps:
+            - "Open http://localhost:8080 in browser"
+            - "Observe: idle-loop.mp4 playing continuously"
+            - "Type: 'Hello Alice!'"
+            - "Click Send"
+          expected:
+            - "Video switches to listening state"
+            - "After AI response, video shows greeting clip"
+            - "Audio plays synchronized with video"
+            - "Video duration matches audio duration (±100ms)"
+            - "Returns to idle loop when complete"
+        
+        - scenario: "Positive interaction"
+          steps:
+            - "Type: 'That's wonderful!'"
+            - "Click Send"
+          expected:
+            - "Emotion detected: friendly_speaking"
+            - "thats-wonderful-to-hear.mp4 plays (looped to audio length)"
+            - "Smooth transition to idle"
+        
+        - scenario: "Empathetic response"
+          steps:
+            - "Type: 'I'm confused about this'"
+            - "Click Send"
+          expected:
+            - "Emotion detected: empathetic"
+            - "concerned-deep-breath.mp4 plays"
+            - "Supportive AI response"
+        
+        - scenario: "Farewell"
+          steps:
+            - "Type: 'Goodbye Alice'"
+            - "Click Send"
+          expected:
+            - "Emotion detected: farewell"
+            - "see-you-later.mp4 plays"
+            - "Warm closing message"
+      
+      manual_checklist:
+        - "[ ] All 4 scenarios pass"
+        - "[ ] Video-audio sync within 100ms"
+        - "[ ] No visual glitches or stuttering"
+        - "[ ] Smooth state transitions"
+        - "[ ] Idle loop resumes correctly"
+      
+      on_manual_fail:
+        - "Record failure details in outputs/logs/test_failures.txt"
+        - "Check browser console for errors"
+        - "Review server logs"
+        - "Escalate to human"
+  
+  gate: "GATE_6"
+  gate_validation:
+    - assertion: "Server running and responsive"
+      test: "curl -s http://localhost:8080/health | grep -q 'healthy'"
+      criticality: "critical"
+    
+    - assertion: "All test scenarios pass (manual)"
+      test: "manual"
+      criticality: "critical"
+    
+    - assertion: "Video files generated during test"
+      test: "[ $(ls -1 outputs/video/*.mp4 | wc -l) -ge 4 ]"
+      criticality: "high"
+  
+  on_gate_pass:
+    - "Log to outputs/logs/gate_6_passed.txt"
+    - "Proceed to Task 7"
+
+# ----------------------------------------------------------------------------
+# TASK 7: PERFORMANCE METRICS COLLECTION
+# ----------------------------------------------------------------------------
+
+task_7:
+  id: "T7"
+  name: "Collect Performance Metrics for Patent Documentation"
+  priority: "high"
+  estimated_time: "45 minutes"
+  dependencies: ["T6"]
+  
+  steps:
+    - step_id: "T7.1"
+      action: "Create metrics collection script"
+      file_to_create: "tests/phase1_metrics.py"
+      content: |
+        """
+        Phase 1 Performance Metrics Collection
+        Measures latency, sync accuracy, and system performance
+        """
+        
+        import time
+        import statistics
+        from pathlib import Path
+        from src.video_duration_matcher import VideoDurationMatcher
+        import librosa
+        import json
+        
+        class MetricsCollector:
+            def __init__(self):
+                self.metrics = {
+                    'duration_matching': [],
+                    'processing_latency': [],
+                    'sync_drift': []
+                }
+            
+            def measure_duration_matching_accuracy(self):
+                """Test how accurately video matches target durations"""
+                matcher = VideoDurationMatcher()
+                test_durations = [5.0, 7.5, 10.0, 12.5, 15.0]
+                
+                for target in test_durations:
+                    start = time.time()
+                    output = matcher.create_duration_matched_clip('neutral_speaking', target)
+                    latency = time.time() - start
+                    
+                    actual = matcher._get_video_duration(output)
+                    drift = abs(actual - target)
+                    
+                    self.metrics['duration_matching'].append({
+                        'target': target,
+                        'actual': actual,
+                        'drift_ms': drift * 1000,
+                        'latency_s': latency
+                    })
+                
+                avg_drift = statistics.mean([m['drift_ms'] for m in self.metrics['duration_matching']])
+                print(f"✅ Average duration drift: {avg_drift:.1f}ms")
+                
+                return avg_drift < 100  # Target: <100ms drift
+            
+            def save_metrics(self):
+                """Save metrics to JSON for patent documentation"""
+                output_file = Path("outputs/logs/phase1_metrics.json")
+                with open(output_file, 'w') as f:
+                    json.dump(self.metrics, f, indent=2)
+                print(f"📊 Metrics saved to {output_file}")
+        
+        if __name__ == "__main__":
+            collector = MetricsCollector()
+            
+            print("🧪 Testing duration matching accuracy...")
+            assert collector.measure_duration_matching_accuracy(), "Duration matching failed target"
+            
+            collector.save_metrics()
+            print("✅ All metrics collected successfully")
+      
+      validation:
+        - "test -f tests/phase1_metrics.py"
+      on_failure:
+        action: "retry"
+        max_retries: 1
+    
+    - step_id: "T7.2"
+      action: "Run metrics collection"
+      commands:
+        - "python tests/phase1_metrics.py"
+      validation:
+        - "Exit code is 0"
+        - "outputs/logs/phase1_metrics.json created"
+      on_failure:
+        action: "check_troubleshooting"
+        error_id: "ERR_METRICS_COLLECTION"
+    
+    - step_id: "T7.3"
+      action: "Generate summary report"
+      commands:
+        - "python -c 'import json; data = json.load(open(\"outputs/logs/phase1_metrics.json\")); print(f\"Average drift: {sum([d[\"drift_ms\"] for d in data[\"duration_matching\"]])/len(data[\"duration_matching\"]):.1f}ms\")'"
+      validation:
+        - "Average drift reported"
+      on_failure:
+        action: "log_and_continue"
+  
+  gate: "GATE_7"
+  gate_validation:
+    - assertion: "Metrics collected"
+      test: "test -f outputs/logs/phase1_metrics.json"
+      criticality: "high"
+    
+    - assertion: "Duration matching meets target"
+      test: "python -c 'import json; data = json.load(open(\"outputs/logs/phase1_metrics.json\")); avg = sum([d[\"drift_ms\"] for d in data[\"duration_matching\"]])/len(data[\"duration_matching\"]); assert avg < 100, f\"Drift {avg}ms exceeds 100ms target\"'"
+      criticality: "high"
+  
+  on_gate_pass:
+    - "Log to outputs/logs/gate_7_passed.txt"
+    - "Phase 1 COMPLETE ✅"
+
+# ============================================================================
+# TROUBLESHOOTING GUIDE
+# ============================================================================
+
+troubleshooting:
+  errors:
+    - error_id: "ERR_VIDEO_DURATION_TEST"
+      description: "VideoDurationMatcher test fails"
+      symptoms:
+        - "Module imports but test video not created"
+        - "FFmpeg command fails"
+      recovery_steps:
+        - "Check FFmpeg is installed: ffmpeg -version"
+        - "Verify video clips exist: ls -la data/video_clips/"
+        - "Check write permissions: touch outputs/video/test.txt"
+        - "Test FFmpeg manually: ffmpeg -i data/video_clips/idle-loop.mp4 -t 10 outputs/video/test.mp4"
+      prevention: "Ensure FFmpeg and all dependencies installed in Task 1"
+    
+    - error_id: "ERR_SERVER_INTEGRATION"
+      description: "Chat server fails to import new modules"
+      symptoms:
+        - "ImportError when starting server"
+        - "ModuleNotFoundError for video_duration_matcher"
+      recovery_steps:
+        - "Verify module exists: test -f src/video_duration_matcher.py"
+        - "Check Python path: python -c 'import sys; print(sys.path)'"
+        - "Test import manually: python -c 'from src.video_duration_matcher import VideoDurationMatcher'"
+      prevention: "Run Gate 3 validation before proceeding to Task 4"
+    
+    - error_id: "ERR_FRONTEND_UPDATE"
+      description: "Frontend video playback broken"
+      symptoms:
+        - "Videos don't play"
+        - "Console errors about video.src"
+      recovery_steps:
+        - "Check browser console for JavaScript errors"
+        - "Verify video endpoint works: curl http://localhost:8080/video/test.mp4"
+        - "Test video URL format matches frontend expectations"
+      prevention: "Test in browser after each frontend change"
+    
+    - error_id: "ERR_SERVER_START"
+      description: "Server fails to start"
+      symptoms:
+        - "Port already in use"
+        - "Module import errors"
+      recovery_steps:
+        - "Kill existing server: pkill -f chat_server"
+        - "Check port availability: lsof -i :8080"
+        - "Start on different port: uvicorn src.chat_server:app --port 8081"
+      prevention: "Always kill previous server before restarting"
+
+# ============================================================================
+# SUCCESS CRITERIA & DELIVERABLES
+# ============================================================================
+
+success_criteria:
+  functional:
+    - "✅ User can chat with Alice via web interface"
+    - "✅ Video clips selected based on detected emotion"
+    - "✅ Video duration matches audio duration (±100ms)"
+    - "✅ Smooth transitions between emotional states"
+    - "✅ Idle loop resumes after responses complete"
+    - "✅ No crashes during 5-minute conversation"
+  
+  performance:
+    - "✅ Video generation latency <5 seconds"
+    - "✅ Audio-video sync drift <100ms average"
+    - "✅ Total response latency <10 seconds"
+  
+  documentation:
+    - "✅ Metrics collected in phase1_metrics.json"
+    - "✅ All gate reports in outputs/logs/"
+    - "✅ Screen recording of working demo"
+
+deliverables:
+  code:
+    - "src/video_duration_matcher.py"
+    - "data/emotion_config.yaml"
+    - "Updated src/chat_server.py"
+    - "Updated templates/index.html"
+    - "tests/phase1_metrics.py"
+  
+  documentation:
+    - "outputs/logs/gate_*.txt (7 gate reports)"
+    - "outputs/logs/phase1_metrics.json"
+    - "Screen recording: demo_phase1.mp4"
+  
+  patent_ready:
+    - "Technical whitepaper outline"
+    - "Performance metrics for claims"
+    - "Video demonstration of working system"
+
+# ============================================================================
+# NEXT STEPS (AFTER PHASE 1)
+# ============================================================================
+
+next_steps:
+  immediate:
+    - "Record screen demo for investor pitch"
+    - "Begin patent provisional application drafting"
+    - "Test with real users (5-10 people)"
+  
+  phase_2:
+    - "Implement real-time mouth ROI replacement"
+    - "Add phoneme-level lip sync"
+    - "Upgrade TTS to XTTS-v2 for better voice quality"
+  
+  funding:
+    - "Prepare pitch deck with Phase 1 demo"
+    - "Target: $250K-$500K seed round"
+    - "Timeline: 4-6 weeks after Phase 1 complete"
