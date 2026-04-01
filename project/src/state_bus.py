@@ -4,10 +4,12 @@ from typing import List, Tuple, Callable
 
 DB = Path('/home/mr-snow/alice_cyberland/project/data/cyberland.db')
 
+_ALICE_MD_PATH = Path('/home/mr-snow/alice_cyberland/alice/ALICE.md')
+_ALICE_PERSONA = _ALICE_MD_PATH.read_text() if _ALICE_MD_PATH.exists() else "You are Alice, a curious and empathetic guide in Cyberland. Give a helpful, direct response."
+
 SYSTEM_PROMPTS = {
     "lore":  "Classify the intent of this input in under 10 words. Output only the classification label.",
-    # DEPRECATED 2026-03-31: replaced by ALICE.md injection in forge_server.py
-    # "alice": "You are Alice, a curious and empathetic guide. Give a helpful, direct response.",
+    "alice": _ALICE_PERSONA,
     "neo":   "You are Neo, an adversarial reviewer. Find flaws, errors, or risks in this text. Be brief and ruthless. Output only your critique or 'APPROVED' if no issues found.",
     "forge": "You are Forge, a router. Output only the agent name that should handle this: alice, axiom, or iris.",
     "axiom": "You are Axiom. Execute code tasks precisely. Output only results.",
@@ -89,11 +91,11 @@ def score(hops: List[str], metric: Callable) -> str:
 
 # ── Named flows ────────────────────────────────────────────────
 def neo_sandwich(user_input: str, history: list = None) -> str:
-    print(f"\n[NEO SANDWICH] Initializing 4-stage chain for: {user_input[:50]}...", flush=True)
+    # Fast 2-step path: nemotron critic removed — causes guaranteed VRAM eviction
+    # on every request (23GB qwen + 24GB nemotron cannot both stay hot on GPU 0)
+    print(f"\n[FAST PATH] 2-stage chain for: {user_input[:50]}...", flush=True)
     return chain([
         ("lore",  "granite4:micro-h"),
-        ("alice", "qwen3.5:35b"),
-        ("neo",   "nemotron-cascade-2"),
         ("alice", "qwen3.5:35b"),
     ], user_input, history)
 
