@@ -24,6 +24,12 @@ import memory_extractor
 
 app = FastAPI(title="Forge Server — NEO SANDWICH")
 
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    print(f"[REQUEST] {request.method} {request.url.path}")
+    response = await call_next(request)
+    return response
+
 
 @app.on_event("startup")
 async def startup():
@@ -112,6 +118,7 @@ async def stream_response(content: str, model: str):
 
 @app.post("/v1/chat/completions")
 @app.post("/v1/completions")
+@app.post("/v1/responses")
 async def openai_completions(
     request: Request, background_tasks: BackgroundTasks
 ):

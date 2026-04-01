@@ -1,4 +1,4 @@
-import sqlite3, uuid, time, ollama
+import sqlite3, uuid, time, ollama, traceback
 from pathlib import Path
 from typing import List, Tuple, Callable
 
@@ -45,25 +45,36 @@ def hop(agent, model, input_text, chain_id=None, seq=0, history: list = None):
         messages.extend(history_window)
     
     messages.append({"role": "user", "content": input_text})
+    print(f"[DEBUG] Full message payload for {agent}: {messages}", flush=True)
     
     try:
-        print(f"[HOP] Calling {agent} ({model})...")
-        client = ollama.Client(timeout=300)
+        print(f"[HOP START] {agent} | Model: {model}...", flush=True)
+        client = ollama.Client(host="http://127.0.0.1:11434", timeout=300)
         resp = client.chat(
             model=model,
             messages=messages,
-            options={"num_predict": 512, "keep_alive": -1}, # Keep in VRAM for sandwich stages
+            options={"num_predict": 2048, "keep_alive": -1, "think": False}, # Disable thinking for content extraction
         )
+        print(f"[DEBUG] Raw response object: {resp}", flush=True)
         out = resp['message']['content'].strip()
         if not out:
-            out = f"[EMPTY OUTPUT - agent:{agent} model:{model}]"
+            thinking = getattr(resp['message'], 'thinking', None) or ''
+            out = thinking[:500].strip() if thinking else ''
+            print(f"[HOP WARNING] {agent} returned empty content! thinking_fallback={bool(out)}", flush=True)
+            if not out:
+                raise ValueError(f"[DEAD HOP] {agent}:{model} returned no content and no thinking. Aborting chain.")
     except Exception as e:
+        print(f"[HOP ERROR] {agent} failed: {e}", flush=True)
+        traceback.print_exc()
         out = f"[HOP FAILED] {e}"
     
     ms = int((time.time()-start)*1000)
-    with sqlite3.connect(DB) as c:
-        c.execute("INSERT INTO hop VALUES (NULL,?,?,?,?,?,?,?,?,?)",
-                  (str(chain_id), seq, str(agent), str(input_text), str(out), ms, None, None, None))
+    try:
+        with sqlite3.connect(DB) as c:
+            c.execute("INSERT INTO hop VALUES (NULL,?,?,?,?,?,?)",
+                      (str(chain_id), seq, str(agent), str(input_text), str(out), ms))
+    except Exception as db_e:
+        print(f"[DB ERROR] Failed to log hop to database: {db_e}")
     return out
 
 def chain(steps: List[Tuple[str,str]], input_text: str, history: list = None) -> str:
@@ -78,7 +89,7 @@ def score(hops: List[str], metric: Callable) -> str:
 
 # ── Named flows ────────────────────────────────────────────────
 def neo_sandwich(user_input: str, history: list = None) -> str:
-    print(f"\n[NEO SANDWICH] Initializing 4-stage chain for: {user_input[:50]}...")
+    print(f"\n[NEO SANDWICH] Initializing 4-stage chain for: {user_input[:50]}...", flush=True)
     return chain([
         ("lore",  "granite4:micro-h"),
         ("alice", "qwen3.5:35b"),
