@@ -47,12 +47,12 @@ def hop(agent, model, input_text, chain_id=None, seq=0, history: list = None):
     messages.append({"role": "user", "content": input_text})
     
     try:
-        resp = ollama.chat(
+        print(f"[HOP] Calling {agent} ({model})...")
+        client = ollama.Client(timeout=300)
+        resp = client.chat(
             model=model,
             messages=messages,
-            options={"num_predict": 512},
-            think=False,
-            timeout=120  # 2 minutes — enough for cold model load
+            options={"num_predict": 512, "keep_alive": -1}, # Keep in VRAM for sandwich stages
         )
         out = resp['message']['content'].strip()
         if not out:
@@ -78,6 +78,7 @@ def score(hops: List[str], metric: Callable) -> str:
 
 # ── Named flows ────────────────────────────────────────────────
 def neo_sandwich(user_input: str, history: list = None) -> str:
+    print(f"\n[NEO SANDWICH] Initializing 4-stage chain for: {user_input[:50]}...")
     return chain([
         ("lore",  "granite4:micro-h"),
         ("alice", "qwen3.5:35b"),
