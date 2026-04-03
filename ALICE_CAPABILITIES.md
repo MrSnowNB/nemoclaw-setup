@@ -1,6 +1,11 @@
-# 🤖 Alice: Capabilities & User Guide
+---
 
-Alice is a high-performance agentic assistant integrated with your local system, the cloud, and specialized AI stacks. This guide serves as the definitive reference for her tools and automated patterns.
+## 🏛️ 0. Hardware & AI-First Architecture
+
+Alice is engineered for **Local High-Performance Inference**.
+- **Brain:** `ollama/qwen3.5:35b` (Q4_K_M).
+- **Endpoint:** Dedicated instance at `http://localhost:11466` (GPU 1 Pinned).
+- **Reasoning:** Alice uses a **First-Principles Reasoning Engine** (see `PRINCIPLES.md` in her workspace) to break problems down into atomic steps.
 
 ---
 
