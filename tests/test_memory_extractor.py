@@ -75,8 +75,6 @@ def test_memory_block(store: MemoryStore) -> None:
     assert "fact one" in block
     assert "fact two" in block
 
-    entries = tmp_memory.get_tier1_entries()
-    assert len(entries) == 50
 
 def test_memory_block_empty(store: MemoryStore) -> None:
     """Test get_memory_block when empty."""
