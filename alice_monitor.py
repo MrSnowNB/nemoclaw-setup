@@ -2,14 +2,29 @@ import json
 import time
 import os
 
-SESSION_FILE = "/home/mr-snow/.openclaw/agents/main/sessions/1176ebfc-9a20-4674-bffe-97bdc93ec2f9.jsonl"
+import os
+import glob
+
+def find_latest_session():
+    session_dir = "/home/mr-snow/.openclaw/agents/main/sessions/"
+    files = glob.glob(os.path.join(session_dir, "*.jsonl"))
+    if not files:
+        return None
+    return max(files, key=os.path.getmtime)
 
 def monitor_alice(follow=False):
     """
     Reads Alice's session log and prints formatted interactions.
     If follow is true, it tails the file.
     """
-    with open(SESSION_FILE, "r") as f:
+    session_file = find_latest_session()
+    if not session_file:
+        print("❌ No session files found.")
+        return
+
+    print(f"📡 [VIGILANCE BRIDGE] Monitoring {session_file}...")
+    
+    with open(session_file, "r") as f:
         # Initial read of existing history
         lines = f.readlines()
         for line in lines:
@@ -57,5 +72,4 @@ def process_line(line):
 if __name__ == "__main__":
     import sys
     follow_mode = "--live" in sys.argv
-    print(f"📡 [VIGILANCE BRIDGE] Monitoring {SESSION_FILE}...")
     monitor_alice(follow=follow_mode)
