@@ -1,12 +1,14 @@
 import json
 import time
 import os
-
-import os
 import glob
+from pathlib import Path
 
 def find_latest_session():
-    session_dir = "/home/mr-snow/.openclaw/agents/main/sessions/"
+    session_dir = os.environ.get(
+        "OPENCLAW_SESSIONS_DIR",
+        str(Path.home() / ".nemoclaw" / "sessions"),
+    )
     files = glob.glob(os.path.join(session_dir, "*.jsonl"))
     if not files:
         return None

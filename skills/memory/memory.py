@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
+import os
 import sys
 import json
 import argparse
 from pathlib import Path
 from datetime import datetime
 
-# OpenClaw Workspace paths
-WORKSPACE = Path("/home/mr-snow/.openclaw/workspace")
+# OpenClaw Workspace paths — resolve from $OPENCLAW_WORKSPACE or ~/.openclaw/workspace
+WORKSPACE = Path(os.environ.get("OPENCLAW_WORKSPACE", Path.home() / ".openclaw" / "workspace"))
 USER_FILE = WORKSPACE / "USER.md"
 MEMORY_FILE = WORKSPACE / "MEMORY.md"
 RECOUNT_FILE = WORKSPACE / "memory/recount.md"

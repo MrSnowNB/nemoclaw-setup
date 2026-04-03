@@ -8,6 +8,7 @@ prompts, manage memory, or run agent chains — OpenClaw handles all of that.
 Architecture:
   Telegram → OpenClaw (brain) → Forge Proxy (this) → Ollama (GPU 3)
 """
+import os
 import time
 import uuid
 import json
@@ -18,7 +19,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse
 
 # ── Configuration ──────────────────────────────────────────────
-OLLAMA_HOST = "http://127.0.0.1:11437"
+OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
 DEFAULT_MODEL = "qwen3.5:35b"
 
 app = FastAPI(title="Forge Proxy")
