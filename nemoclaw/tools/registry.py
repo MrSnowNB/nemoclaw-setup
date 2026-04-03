@@ -26,11 +26,12 @@ class ToolRegistry:
     def register_defaults(self) -> None:
         """Register all built-in tools (not including memory tools, which need a store)."""
         from nemoclaw.tools.bash import BashTool
+        from nemoclaw.tools.browser import BrowserTool
         from nemoclaw.tools.edit_file import EditFileTool
         from nemoclaw.tools.glob_tool import GlobTool
         from nemoclaw.tools.read_file import ReadFileTool
         from nemoclaw.tools.web_fetch import WebFetchTool
         from nemoclaw.tools.write_file import WriteFileTool
 
-        for tool_cls in (BashTool, ReadFileTool, WriteFileTool, EditFileTool, WebFetchTool, GlobTool):
+        for tool_cls in (BashTool, ReadFileTool, WriteFileTool, EditFileTool, WebFetchTool, GlobTool, BrowserTool):
             self.register(tool_cls())
