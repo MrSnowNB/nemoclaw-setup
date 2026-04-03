@@ -1,10 +1,10 @@
-"""Permission pipeline — layered tool-call authorization.
+"""Permission pipeline — layered allow/deny/ask evaluation.
 
 Layers:
-1. Allow list — always permitted tools
+1. Allow list — always allowed tools (no confirmation needed)
 2. Deny list — always blocked tools
-3. Ask list — tools requiring user confirmation
-4. Auto-approve after N approvals in a session
+3. Ask list — require user confirmation
+4. Auto-approve after N — auto-approve a tool after user approves N times
 5. Fallback — interactive confirmation
 """
 
@@ -12,22 +12,16 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from enum import Enum
 from typing import Any, Callable, Coroutine
 
 from nemoclaw.models import ToolCall
+from nemoclaw.permissions.base import PermissionProvider
 
 logger = logging.getLogger(__name__)
 
 
-class PermissionDecision(Enum):
-    ALLOW = "allow"
-    DENY = "deny"
-    ASK = "ask"
-
-
-class PermissionPipeline:
-    """Evaluates whether a tool call should be allowed, denied, or asked about."""
+class PermissionPipeline(PermissionProvider):
+    """Layered permission evaluation for tool calls."""
 
     def __init__(
         self,
@@ -35,77 +29,71 @@ class PermissionPipeline:
         always_deny: list[str] | None = None,
         always_ask: list[str] | None = None,
         auto_allow_after_n: int = 3,
-        confirm_callback: Callable[[str, dict], Coroutine[Any, Any, bool]] | None = None,
+        confirm_callback: Callable[[str], Coroutine[Any, Any, bool]] | None = None,
     ) -> None:
-        self._always_allow = set(always_allow or [
+        self.always_allow = set(always_allow or [
             "read_file", "glob", "web_fetch", "memory_search",
         ])
-        self._always_deny = set(always_deny or [])
-        self._always_ask = set(always_ask or ["bash"])
-        self._auto_allow_after_n = auto_allow_after_n
-        self._confirm_callback = confirm_callback
+        self.always_deny = set(always_deny or [])
+        self.always_ask = set(always_ask or ["bash"])
+        self.auto_allow_after_n = auto_allow_after_n
+        self.confirm_callback = confirm_callback
 
-        # Track approvals per tool name in this session
+        # Track per-tool approval counts for auto-approve
         self._approval_counts: dict[str, int] = defaultdict(int)
 
-    def evaluate(self, tool_call: ToolCall) -> PermissionDecision:
-        """Evaluate the permission for a tool call synchronously.
-
-        Returns the decision without performing interactive confirmation.
-        """
-        name = tool_call.name
-
-        # Layer 1: Allow list
-        if name in self._always_allow:
-            return PermissionDecision.ALLOW
-
-        # Layer 2: Deny list
-        if name in self._always_deny:
-            return PermissionDecision.DENY
-
-        # Layer 3: Auto-approve after N session approvals
-        if self._approval_counts[name] >= self._auto_allow_after_n:
-            return PermissionDecision.ALLOW
-
-        # Layer 4: Ask list (explicit)
-        if name in self._always_ask:
-            return PermissionDecision.ASK
-
-        # Layer 5: Fallback — ask for anything not in allow list
-        return PermissionDecision.ASK
-
     async def check_permission(self, tool_call: ToolCall) -> bool:
-        """Check if a tool call is permitted, prompting the user if needed.
+        """Evaluate whether a tool call is permitted.
 
         Returns True if allowed, False if denied.
         """
-        decision = self.evaluate(tool_call)
+        tool_name = tool_call.name
 
-        if decision == PermissionDecision.ALLOW:
+        # Layer 1: Always allow
+        if tool_name in self.always_allow:
+            logger.debug("Permission ALLOW (allow list): %s", tool_name)
             return True
 
-        if decision == PermissionDecision.DENY:
-            logger.warning("Permission denied for tool: %s", tool_call.name)
+        # Layer 2: Always deny
+        if tool_name in self.always_deny:
+            logger.warning("Permission DENY (deny list): %s", tool_name)
             return False
 
-        # ASK — try interactive confirmation
-        if self._confirm_callback:
-            approved = await self._confirm_callback(
-                tool_call.name, tool_call.arguments,
+        # Check auto-approve threshold
+        if self._approval_counts[tool_name] >= self.auto_allow_after_n:
+            logger.debug(
+                "Permission ALLOW (auto-approved after %d): %s",
+                self.auto_allow_after_n,
+                tool_name,
             )
-            if approved:
-                self._approval_counts[tool_call.name] += 1
-                return True
-            return False
+            return True
 
-        # No callback — default to allow (CLI mode, tools are local)
-        logger.debug("No confirm callback, auto-allowing: %s", tool_call.name)
+        # Layer 3: Ask list — require confirmation
+        if tool_name in self.always_ask:
+            allowed = await self._confirm(tool_name)
+            if allowed:
+                self._approval_counts[tool_name] += 1
+            return allowed
+
+        # Layer 4: Fallback — interactive confirmation for unknown tools
+        allowed = await self._confirm(tool_name)
+        if allowed:
+            self._approval_counts[tool_name] += 1
+        return allowed
+
+    async def _confirm(self, tool_name: str) -> bool:
+        """Request interactive confirmation for a tool call."""
+        if self.confirm_callback:
+            try:
+                return await self.confirm_callback(tool_name)
+            except Exception:
+                logger.exception("Confirmation callback failed for %s", tool_name)
+                return False
+
+        # No callback configured — default allow in non-interactive mode
+        logger.debug("Permission ALLOW (no callback, default): %s", tool_name)
         return True
 
-    def record_approval(self, tool_name: str) -> None:
-        """Manually record an approval for auto-approve tracking."""
-        self._approval_counts[tool_name] += 1
-
-    def reset_session(self) -> None:
-        """Reset session-level approval counts."""
+    def reset_approvals(self) -> None:
+        """Reset all auto-approval counters (e.g. at session start)."""
         self._approval_counts.clear()

@@ -1,126 +1,143 @@
-"""Tests for the three-tier memory store."""
+"""Tests for memory store and memory tools."""
 
 import json
 import pytest
 from pathlib import Path
+from unittest.mock import AsyncMock
 
 from nemoclaw.memory.store import MemoryStore
+from nemoclaw.memory.tools import MemorySearchTool, MemoryWriteTool
 
 
 @pytest.fixture
-def store(tmp_path):
-    """Create a MemoryStore backed by a temp directory."""
-    memory_dir = tmp_path / "memory"
-    session_dir = tmp_path / "sessions"
-    return MemoryStore(memory_dir=memory_dir, session_dir=session_dir)
+def memory_dir(tmp_path: Path) -> Path:
+    mem_dir = tmp_path / "memory"
+    mem_dir.mkdir()
+    return mem_dir
 
 
-# ── Tier 1: MEMORY.md ─────────────────────────────────────────────
-
-class TestTier1:
-    def test_remember(self, store):
-        result = store.remember("likes coffee", category="preferences")
-        assert "Remembered" in result
-        entries = store.get_tier1_entries()
-        assert "[preferences] likes coffee" in entries[0]
-
-    def test_duplicate_detection(self, store):
-        store.remember("likes coffee")
-        result = store.remember("likes coffee")
-        assert "Already remembered" in result
-
-    def test_forget(self, store):
-        store.remember("likes pie")
-        store.remember("hates cake")
-        result = store.forget("pie")
-        assert "Forgot 1" in result
-        assert len(store.get_tier1_entries()) == 1
-
-    def test_eviction_at_capacity(self, store):
-        for i in range(50):
-            store.remember(f"fact-{i}")
-        store.remember("fact-50")
-        entries = store.get_tier1_entries()
-        assert len(entries) == 50
-        assert "fact-0" not in " ".join(entries)
-
-    def test_memory_block_default(self, store):
-        assert "No memory" in store.get_memory_block()
-
-    def test_memory_block_with_content(self, store):
-        store.remember("important fact")
-        assert "important fact" in store.get_memory_block()
+@pytest.fixture
+def sessions_dir(tmp_path: Path) -> Path:
+    sess_dir = tmp_path / "sessions"
+    sess_dir.mkdir()
+    return sess_dir
 
 
-# ── Tier 2: Topic files ───────────────────────────────────────────
-
-class TestTier2:
-    def test_write_and_read_topic(self, store):
-        store.write_topic("Python Tips", "Use list comprehensions for speed.")
-        content = store.read_topic("Python Tips")
-        assert content is not None
-        assert "list comprehensions" in content
-        assert "Python Tips" in content
-
-    def test_read_nonexistent_topic(self, store):
-        assert store.read_topic("nonexistent") is None
-
-    def test_list_topics(self, store):
-        store.write_topic("Topic A", "Content A")
-        store.write_topic("Topic B", "Content B")
-        topics = store.list_topics()
-        assert "topic-a" in topics
-        assert "topic-b" in topics
-
-    def test_topic_slug_normalization(self, store):
-        store.write_topic("My Fancy Topic!!!", "content")
-        topics = store.list_topics()
-        assert "my-fancy-topic" in topics
+@pytest.fixture
+def store(memory_dir: Path, sessions_dir: Path) -> MemoryStore:
+    return MemoryStore(memory_dir=memory_dir, sessions_dir=sessions_dir)
 
 
-# ── Tier 3: Session search ────────────────────────────────────────
+class TestMemoryStore:
+    """Test the MemoryStore class."""
 
-class TestTier3:
-    def test_search_sessions(self, tmp_path):
-        session_dir = tmp_path / "sessions"
-        sess = session_dir / "2026-01-01_120000"
-        sess.mkdir(parents=True)
+    def test_slugify(self) -> None:
+        assert MemoryStore._slugify("Hello World!") == "hello-world"
+        assert MemoryStore._slugify("test/path") == "testpath"
+        assert MemoryStore._slugify("  spaces  ") == "spaces"
+
+    def test_remember_writes_to_file(self, store: MemoryStore) -> None:
+        store.remember("test fact", category="test")
+        content = store.memory_file.read_text()
+        assert "test fact" in content
+
+    def test_topic_directories_created(self, store: MemoryStore) -> None:
+        assert store.topics_dir.exists()
+
+    def test_search_sessions_with_data(
+        self, store: MemoryStore, sessions_dir: Path
+    ) -> None:
+        # Create a fake session with JSONL data
+        session_dir = sessions_dir / "2026-01-01_000000"
+        session_dir.mkdir()
+        jsonl_file = session_dir / "messages.jsonl"
         entries = [
-            {"timestamp": "2026-01-01T12:00:00Z", "role": "user", "content": "Tell me about dogs"},
-            {"timestamp": "2026-01-01T12:00:01Z", "role": "assistant", "content": "Dogs are great pets!"},
+            {"role": "user", "content": "I like cold brew coffee", "timestamp": "2026-01-01T00:00:00Z"},
+            {"role": "assistant", "content": "Noted!", "timestamp": "2026-01-01T00:00:01Z"},
         ]
-        log_file = sess / "messages.jsonl"
-        log_file.write_text("\n".join(json.dumps(e) for e in entries))
+        with open(jsonl_file, "w") as f:
+            for entry in entries:
+                f.write(json.dumps(entry) + "\n")
 
-        store = MemoryStore(memory_dir=tmp_path / "memory", session_dir=session_dir)
-        results = store.search_sessions("dogs")
-        assert len(results) == 2
-        assert results[0]["role"] == "user"
+        results = store.search_sessions("cold brew")
+        assert len(results) == 1
+        assert "cold brew" in results[0]["content"]
 
-    def test_search_sessions_empty(self, store):
-        results = store.search_sessions("anything")
+    def test_search_sessions_empty(self, store: MemoryStore) -> None:
+        results = store.search_sessions("nonexistent")
         assert results == []
 
 
-# ── Cross-tier search ──────────────────────────────────────────────
+class TestMemoryWriteTool:
+    """Test the MemoryWriteTool."""
 
-class TestCrossTierSearch:
-    def test_search_across_tiers(self, tmp_path):
-        session_dir = tmp_path / "sessions"
-        sess = session_dir / "2026-01-01_120000"
-        sess.mkdir(parents=True)
-        log_file = sess / "messages.jsonl"
-        log_file.write_text(json.dumps({
-            "timestamp": "2026-01-01T12:00:00Z",
-            "role": "user",
-            "content": "I love Python programming",
-        }))
+    @pytest.fixture
+    def tool(self, store: MemoryStore) -> MemoryWriteTool:
+        return MemoryWriteTool(store)
 
-        store = MemoryStore(memory_dir=tmp_path / "memory", session_dir=session_dir)
-        store.remember("Python is my favorite language", category="preferences")
-        store.write_topic("Python", "Python is a versatile programming language.")
+    @pytest.mark.asyncio
+    async def test_remember_action(self, tool: MemoryWriteTool) -> None:
+        result = await tool.execute(
+            tool_call_id="t1",
+            action="remember",
+            content="likes pizza",
+            category="preference",
+        )
+        assert not result.is_error
+        assert "Remembered" in result.content
 
-        results = store.search("Python")
-        assert len(results["tier1"]) >= 1
-        assert len(results["tier2"]) >= 1
-        assert len(results["tier3"]) >= 1
+    @pytest.mark.asyncio
+    async def test_forget_action(self, tool: MemoryWriteTool, store: MemoryStore) -> None:
+        store.remember("likes pizza", "preference")
+        result = await tool.execute(
+            tool_call_id="t2",
+            action="forget",
+            content="pizza",
+        )
+        assert not result.is_error
+        assert "Forgot" in result.content
+
+    @pytest.mark.asyncio
+    async def test_remember_with_topic(self, tool: MemoryWriteTool) -> None:
+        result = await tool.execute(
+            tool_call_id="t3",
+            action="remember",
+            content="detailed notes about project X",
+            category="project",
+            topic="project-x",
+        )
+        assert not result.is_error
+        assert "Saved topic" in result.content
+
+    @pytest.mark.asyncio
+    async def test_unknown_action(self, tool: MemoryWriteTool) -> None:
+        result = await tool.execute(
+            tool_call_id="t4",
+            action="invalid",
+            content="test",
+        )
+        assert result.is_error
+        assert "Unknown action" in result.content
+
+
+class TestMemorySearchTool:
+    """Test the MemorySearchTool."""
+
+    @pytest.fixture
+    def tool(self, store: MemoryStore) -> MemorySearchTool:
+        return MemorySearchTool(store)
+
+    @pytest.mark.asyncio
+    async def test_search_found(
+        self, tool: MemorySearchTool, store: MemoryStore
+    ) -> None:
+        store.remember("likes cold brew", "preference")
+        result = await tool.execute(tool_call_id="s1", query="cold brew")
+        assert not result.is_error
+        assert "cold brew" in result.content
+
+    @pytest.mark.asyncio
+    async def test_search_not_found(self, tool: MemorySearchTool) -> None:
+        result = await tool.execute(tool_call_id="s2", query="nonexistent")
+        assert not result.is_error
+        assert "No memory entries found" in result.content

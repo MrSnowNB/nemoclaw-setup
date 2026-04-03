@@ -13,13 +13,12 @@ from nemoclaw.agent.hooks import post_response_hook, pre_response_hook
 from nemoclaw.agent.loop import run_agent_loop
 from nemoclaw.agent.prompt import build_system_prompt
 from nemoclaw.config import Settings
-from nemoclaw.guards.clause_guards import ClauseGuardRunner
+from nemoclaw.guards.clause_guards import ClauseGuards
 from nemoclaw.llm.registry import create_llm_provider
 from nemoclaw.memory.store import MemoryStore
 from nemoclaw.memory.tools import MemorySearchTool, MemoryWriteTool
 from nemoclaw.models import Message
 from nemoclaw.permissions.pipeline import PermissionPipeline
-from nemoclaw.session.loader import SessionLoader
 from nemoclaw.session.manager import SessionManager
 from nemoclaw.tools.registry import ToolRegistry
 from nemoclaw.transport.cli import CLITransport
@@ -70,6 +69,14 @@ def parse_args() -> argparse.Namespace:
         "--verbose", "-v", action="store_true",
         help="Enable debug logging",
     )
+    parser.add_argument(
+        "--continue", dest="continue_session", action="store_true",
+        help="Resume the most recent session",
+    )
+    parser.add_argument(
+        "--resume", default=None, metavar="SESSION_ID",
+        help="Resume a specific session by ID",
+    )
     return parser.parse_args()
 
 
@@ -100,74 +107,64 @@ async def run(args: argparse.Namespace) -> None:
 
     # Initialize components
     llm = create_llm_provider(settings)
+
+    # ── Memory Store ────────────────────────────────────────────────
+    memory_store = MemoryStore(
+        memory_dir=settings.memory_dir,
+        sessions_dir=settings.session_dir,
+    )
+
+    # ── Tool Registry ───────────────────────────────────────────────
     tool_registry = ToolRegistry()
     if not args.no_tools:
         tool_registry.register_defaults()
-
-    # ── Memory store ───────────────────────────────────────────────
-    memory_store = MemoryStore(
-        memory_dir=settings.memory_dir,
-        session_dir=settings.session_dir,
-    )
-
-    # Register memory tools
-    if not args.no_tools:
+        # Register memory tools
         tool_registry.register(MemoryWriteTool(memory_store))
         tool_registry.register(MemorySearchTool(memory_store))
 
-    # ── Session manager ────────────────────────────────────────────
+    # ── Session Manager ─────────────────────────────────────────────
     session_mgr = SessionManager(
-        session_dir=settings.session_dir,
+        sessions_dir=settings.session_dir,
         model=settings.llm_model,
         persona=str(settings.persona_path),
     )
 
-    # ── Session resume ─────────────────────────────────────────────
+    # ── Conversation State ──────────────────────────────────────────
     history: list[Message] = []
-    loader = SessionLoader(settings.session_dir)
 
-    if args.continue_session:
-        latest = loader.find_latest_session()
-        if latest:
-            history = loader.load_history(latest)
-            session_mgr.resume_session(latest)
-            logging.info("Resumed latest session: %s (%d messages)", latest.name, len(history))
-        else:
-            session_mgr.start_new_session()
-    elif args.resume:
-        session_path = loader.find_session_by_id(args.resume)
-        if session_path:
-            history = loader.load_history(session_path)
-            session_mgr.resume_session(session_path)
-            logging.info("Resumed session: %s (%d messages)", session_path.name, len(history))
-        else:
-            logging.warning("Session '%s' not found, starting new session", args.resume)
+    if args.resume:
+        history = session_mgr.resume_session(args.resume)
+    elif args.continue_session:
+        try:
+            history = session_mgr.continue_last_session()
+        except FileNotFoundError:
             session_mgr.start_new_session()
     else:
         session_mgr.start_new_session()
 
-    # ── Clause guards ──────────────────────────────────────────────
-    guards = ClauseGuardRunner(
-        patterns_path=settings.guards_patterns_path,
-        max_message_length=settings.guards_max_message_length,
-        rate_limit_per_minute=settings.guards_rate_limit,
+    # ── Clause Guards ───────────────────────────────────────────────
+    patterns_path = Path("nemoclaw/guards/patterns.yaml")
+    clause_guards = ClauseGuards(
+        patterns_path=patterns_path,
         enabled=settings.guards_enabled,
     )
 
-    # ── Permission pipeline ────────────────────────────────────────
-    permissions = PermissionPipeline(
+    # ── Permission Pipeline ─────────────────────────────────────────
+    permission_pipeline = PermissionPipeline(
         always_allow=settings.permissions_always_allow,
         always_deny=settings.permissions_always_deny,
         always_ask=settings.permissions_always_ask,
         auto_allow_after_n=settings.permissions_auto_allow_after_n,
     )
 
-    # ── Context compaction ─────────────────────────────────────────
-    compaction = CompactionManager(
+    # ── Compaction Manager ──────────────────────────────────────────
+    compaction_mgr = CompactionManager(
         max_context_tokens=settings.max_context_tokens,
+        memory_store=memory_store,
     )
 
-    # ── Build system prompt ────────────────────────────────────────
+    # ── Build System Prompt ─────────────────────────────────────────
+    memory_block = memory_store.get_memory_block()
     tool_descriptions = [
         f"{t.name}: {t.description}" for t in tool_registry.tools.values()
     ]
@@ -178,9 +175,8 @@ async def run(args: argparse.Namespace) -> None:
         memory_block=memory_block,
     )
 
-    # Initialize transport
+    # ── Initialize Transport ────────────────────────────────────────
     transport = CLITransport()
-
     await transport.startup()
 
     try:
@@ -218,9 +214,9 @@ async def run(args: argparse.Namespace) -> None:
                     on_chunk=transport.send_chunk,
                     on_tool_call=transport.send_tool_status,
                     session_manager=session_mgr,
-                    guards=guards,
-                    permissions=permissions,
-                    compaction=compaction,
+                    clause_guards=clause_guards,
+                    permission_pipeline=permission_pipeline,
+                    compaction_manager=compaction_mgr,
                 )
 
                 await transport.send_response(response.content)

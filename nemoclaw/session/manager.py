@@ -1,7 +1,7 @@
-"""Session manager — JSONL logging and session lifecycle.
+"""Session manager — JSONL-based session persistence.
 
-Creates session directories under ~/.nemoclaw/sessions/YYYY-MM-DD_HHMMSS/,
-writes every message exchange as JSONL, and manages session metadata.
+Creates a session directory under ~/.nemoclaw/sessions/YYYY-MM-DD_HHMMSS/,
+writes every message exchange as JSONL, and supports --continue/--resume.
 """
 
 from __future__ import annotations
@@ -18,109 +18,105 @@ logger = logging.getLogger(__name__)
 
 
 class SessionManager:
-    """Manages a single session's JSONL log and metadata."""
+    """Manages session persistence via JSONL files.
 
-    def __init__(self, session_dir: Path, model: str = "", persona: str = "") -> None:
-        self._base_dir = Path(session_dir).expanduser()
-        self._model = model
-        self._persona = persona
-        self._session_path: Path | None = None
-        self._log_file: Path | None = None
-        self._metadata_file: Path | None = None
-        self._message_count: int = 0
-        self._session_id: str = ""
-        self._started_at: str = ""
+    Each session lives in its own directory with:
+    - session.json: metadata (id, started_at, model, persona, message_count)
+    - messages.jsonl: one JSON object per line for each message
+    """
 
-    @property
-    def session_id(self) -> str:
-        return self._session_id
+    def __init__(self, sessions_dir: Path, model: str = "", persona: str = "") -> None:
+        self.sessions_dir = sessions_dir
+        self.model = model
+        self.persona = persona
+        self.session_id: str = ""
+        self.session_path: Path = Path()
+        self.messages_file: Path = Path()
+        self.message_count: int = 0
 
-    @property
-    def session_path(self) -> Path | None:
-        return self._session_path
-
-    @property
-    def message_count(self) -> int:
-        return self._message_count
-
-    def start_new_session(self) -> Path:
-        """Create a new session directory and initialize files."""
+    def start_new_session(self) -> str:
+        """Create a new session directory and metadata file."""
         now = datetime.now(timezone.utc)
-        self._session_id = now.strftime("%Y-%m-%d_%H%M%S")
-        self._started_at = now.isoformat()
-        self._session_path = self._base_dir / self._session_id
-        self._session_path.mkdir(parents=True, exist_ok=True)
+        self.session_id = now.strftime("%Y-%m-%d_%H%M%S")
+        self.session_path = self.sessions_dir / self.session_id
+        self.session_path.mkdir(parents=True, exist_ok=True)
+        self.messages_file = self.session_path / "messages.jsonl"
+        self.message_count = 0
 
-        self._log_file = self._session_path / "messages.jsonl"
-        self._metadata_file = self._session_path / "session.json"
-        self._message_count = 0
+        metadata = {
+            "id": self.session_id,
+            "started_at": now.isoformat(),
+            "model": self.model,
+            "persona": self.persona,
+            "message_count": 0,
+        }
+        self._write_metadata(metadata)
+        logger.info("Started new session: %s", self.session_id)
+        return self.session_id
 
-        self._write_metadata()
-        logger.info("Started session %s at %s", self._session_id, self._session_path)
-        return self._session_path
+    def resume_session(self, session_id: str) -> list[Message]:
+        """Resume a specific session by ID, loading its history."""
+        self.session_id = session_id
+        self.session_path = self.sessions_dir / session_id
+        self.messages_file = self.session_path / "messages.jsonl"
 
-    def resume_session(self, session_path: Path) -> int:
-        """Resume an existing session, returning the message count loaded."""
-        self._session_path = Path(session_path)
-        self._log_file = self._session_path / "messages.jsonl"
-        self._metadata_file = self._session_path / "session.json"
+        if not self.session_path.exists():
+            raise FileNotFoundError(f"Session not found: {session_id}")
 
-        # Load metadata
-        if self._metadata_file.exists():
-            meta = json.loads(self._metadata_file.read_text(encoding="utf-8"))
-            self._session_id = meta.get("id", self._session_path.name)
-            self._started_at = meta.get("started_at", "")
-            self._message_count = meta.get("message_count", 0)
-        else:
-            self._session_id = self._session_path.name
-            self._started_at = ""
-            self._message_count = 0
+        from nemoclaw.session.loader import load_messages_from_jsonl
 
-        # Count existing lines
-        if self._log_file.exists():
-            with open(self._log_file, encoding="utf-8") as f:
-                self._message_count = sum(1 for _ in f)
+        messages = load_messages_from_jsonl(self.messages_file)
+        self.message_count = len(messages)
+        logger.info("Resumed session %s with %d messages", session_id, self.message_count)
+        return messages
 
-        logger.info("Resumed session %s (%d messages)", self._session_id, self._message_count)
-        return self._message_count
+    def continue_last_session(self) -> list[Message]:
+        """Resume the most recent session."""
+        from nemoclaw.session.loader import find_latest_session
 
-    def log_message(self, message: Message) -> None:
+        latest = find_latest_session(self.sessions_dir)
+        if latest is None:
+            raise FileNotFoundError("No previous sessions found")
+        return self.resume_session(latest)
+
+    def log_message(
+        self,
+        role: str,
+        content: str | None = None,
+        tool_calls: list[ToolCall] | None = None,
+        tool_call_id: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
         """Append a message to the JSONL log."""
-        if self._log_file is None:
-            return
-
         entry: dict[str, Any] = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "role": message.role,
-            "content": message.content,
+            "role": role,
+            "content": content,
         }
-        if message.tool_calls:
-            entry["tool_calls"] = [
-                {"id": tc.id, "name": tc.name, "arguments": tc.arguments}
-                for tc in message.tool_calls
-            ]
-        if message.tool_call_id:
-            entry["tool_call_id"] = message.tool_call_id
+        if tool_calls:
+            entry["tool_calls"] = [tc.model_dump() for tc in tool_calls]
+        if tool_call_id:
+            entry["tool_call_id"] = tool_call_id
+        if metadata:
+            entry["metadata"] = metadata
 
-        with open(self._log_file, "a", encoding="utf-8") as f:
+        with open(self.messages_file, "a", encoding="utf-8") as f:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
-        self._message_count += 1
-        self._write_metadata()
+        self.message_count += 1
+        self._update_message_count()
 
-    def _write_metadata(self) -> None:
-        """Write/update the session metadata file."""
-        if self._metadata_file is None:
-            return
+    def _write_metadata(self, metadata: dict[str, Any]) -> None:
+        """Write session metadata to session.json."""
+        meta_path = self.session_path / "session.json"
+        with open(meta_path, "w", encoding="utf-8") as f:
+            json.dump(metadata, f, indent=2, ensure_ascii=False)
 
-        meta = {
-            "id": self._session_id,
-            "started_at": self._started_at,
-            "model": self._model,
-            "persona": self._persona,
-            "message_count": self._message_count,
-        }
-        self._metadata_file.write_text(
-            json.dumps(meta, indent=2, ensure_ascii=False),
-            encoding="utf-8",
-        )
+    def _update_message_count(self) -> None:
+        """Update the message_count in session.json."""
+        meta_path = self.session_path / "session.json"
+        if meta_path.exists():
+            with open(meta_path) as f:
+                metadata = json.load(f)
+            metadata["message_count"] = self.message_count
+            self._write_metadata(metadata)

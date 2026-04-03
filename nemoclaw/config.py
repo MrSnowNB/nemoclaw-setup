@@ -1,6 +1,6 @@
 """Configuration management using pydantic-settings.
 
-Loads from: environment variables → .env file → config/default.yaml → defaults.
+Loads from: environment variables -> .env file -> config/default.yaml -> defaults.
 All paths are relative to base_dir (default ~/.nemoclaw), expandable.
 """
 
@@ -59,13 +59,7 @@ class Settings(BaseSettings):
     # Transport
     transport: str = "cli"
 
-    # ── Guards (Phase 5) ───────────────────────────────────────────
-    guards_enabled: bool = True
-    guards_patterns_path: Path | None = None
-    guards_max_message_length: int = 4096
-    guards_rate_limit: int = 20
-
-    # ── Permissions (Phase 5) ──────────────────────────────────────
+    # ── Permissions ─────────────────────────────────────────────────
     permissions_always_allow: list[str] = [
         "read_file", "glob", "web_fetch", "memory_search",
     ]
@@ -73,7 +67,11 @@ class Settings(BaseSettings):
     permissions_always_ask: list[str] = ["bash"]
     permissions_auto_allow_after_n: int = 3
 
-    # ── Context compaction (Phase 4) ───────────────────────────────
+    # ── Guards ──────────────────────────────────────────────────────
+    guards_enabled: bool = True
+    guards_patterns_path: str = "nemoclaw/guards/patterns.yaml"
+
+    # ── Context Window ──────────────────────────────────────────────
     max_context_tokens: int = 32768
 
     @field_validator("base_dir", mode="before")

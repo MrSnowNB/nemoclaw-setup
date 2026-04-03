@@ -2,12 +2,13 @@
 
 The loop:
 1. Build messages (system + history + user input)
-2. Run clause guards on input
-3. Call LLM with tool definitions
-4. Run permission check on tool calls
+2. Run input guards (CG-01..CG-05)
+3. Check permissions on tool calls
+4. Call LLM with tool definitions
 5. If tool_calls in response: execute tools, append results, loop
-6. Run PII guard on output
-7. If text only: return response, break
+6. Run output guards (PII redaction)
+7. Log all messages via session manager
+8. If text only: return response, break
 """
 
 from __future__ import annotations
@@ -115,11 +116,10 @@ async def run_agent_loop(
     stream: bool = True,
     on_chunk: Callable[[str], Coroutine] | None = None,
     on_tool_call: Callable[..., Coroutine] | None = None,
-    session_manager: SessionManager | None = None,
-    guards: ClauseGuardRunner | None = None,
-    permissions: PermissionPipeline | None = None,
-    compaction: CompactionManager | None = None,
-    user_id: str = "default",
+    session_manager: Any | None = None,
+    clause_guards: Any | None = None,
+    permission_pipeline: Any | None = None,
+    compaction_manager: Any | None = None,
 ) -> AgentResponse:
     """Run the core ReAct agent loop.
 
@@ -133,43 +133,43 @@ async def run_agent_loop(
         stream: Whether to stream the final text response.
         on_chunk: Callback for streaming text chunks.
         on_tool_call: Callback for tool execution status.
-        session_manager: Optional session manager for JSONL logging.
-        guards: Optional clause guard runner for safety checks.
-        permissions: Optional permission pipeline for tool authorization.
-        compaction: Optional compaction manager for context management.
-        user_id: User identifier for rate limiting.
+        session_manager: Optional SessionManager for JSONL logging.
+        clause_guards: Optional ClauseGuards for input/output filtering.
+        permission_pipeline: Optional PermissionPipeline for tool access control.
+        compaction_manager: Optional CompactionManager for context size management.
 
     Returns:
         AgentResponse with the final text content and metadata.
     """
-    # ── Input guards ───────────────────────────────────────────────
-    if guards:
-        guard_result = guards.check_input(user_input, user_id=user_id)
-        if guard_result.blocked:
+    # ── Input Guards ────────────────────────────────────────────────
+    if clause_guards:
+        guard_result = clause_guards.check_input(user_input)
+        if not guard_result.passed:
             logger.info("Guard %s blocked input", guard_result.guard_id)
-            blocked_response = Message(role="assistant", content=guard_result.response)
+            blocked_content = guard_result.message
             history.append(Message(role="user", content=user_input))
-            history.append(blocked_response)
+            history.append(Message(role="assistant", content=blocked_content))
             if session_manager:
-                session_manager.log_message(history[-2])
-                session_manager.log_message(history[-1])
+                session_manager.log_message("user", user_input)
+                session_manager.log_message(
+                    "assistant", blocked_content,
+                    metadata={"guard": guard_result.guard_id},
+                )
             return AgentResponse(
-                content=guard_result.response,
+                content=blocked_content,
                 tool_calls_made=[],
                 token_usage=TokenUsage(),
                 turns_used=0,
             )
 
     # Add user message to history
-    user_msg = Message(role="user", content=user_input)
-    history.append(user_msg)
+    history.append(Message(role="user", content=user_input))
     if session_manager:
-        session_manager.log_message(user_msg)
+        session_manager.log_message("user", user_input)
 
-    # ── Context compaction ─────────────────────────────────────────
-    if compaction and compaction.needs_compaction(history, system_prompt):
-        logger.info("Context compaction triggered")
-        history[:] = compaction.compact(history)
+    # ── Context Compaction ──────────────────────────────────────────
+    if compaction_manager and compaction_manager.needs_compaction(system_prompt, history):
+        history[:] = compaction_manager.compact(system_prompt, history)
 
     all_tool_calls: list[ToolCall] = []
     total_usage = TokenUsage()
@@ -183,6 +183,7 @@ async def run_agent_loop(
         messages = [Message(role="system", content=system_prompt)] + history
 
         if stream and turns == 1:
+            # First turn — try streaming for the initial response
             pass
 
         # Non-streaming call to get tool calls or final response
@@ -207,41 +208,37 @@ async def run_agent_loop(
             tool_calls = _parse_tool_calls(raw_tool_calls)
             all_tool_calls.extend(tool_calls)
 
-            # ── Permission check ───────────────────────────────────
-            if permissions:
-                allowed_calls = []
+            # ── Permission Check ────────────────────────────────
+            if permission_pipeline:
+                permitted_calls = []
                 for tc in tool_calls:
-                    if await permissions.check_permission(tc):
-                        allowed_calls.append(tc)
+                    allowed = await permission_pipeline.check_permission(tc)
+                    if allowed:
+                        permitted_calls.append(tc)
                     else:
                         logger.warning("Permission denied for tool: %s", tc.name)
-                tool_calls = allowed_calls
-
-                if not tool_calls:
-                    # All tools were denied — return a message
-                    denied_msg = Message(
-                        role="assistant",
-                        content="Tool calls were not permitted.",
-                    )
-                    history.append(denied_msg)
-                    if session_manager:
-                        session_manager.log_message(denied_msg)
-                    return AgentResponse(
-                        content="Tool calls were not permitted.",
-                        tool_calls_made=all_tool_calls,
-                        token_usage=total_usage,
-                        turns_used=turns,
-                    )
+                        history.append(Message(
+                            role="tool",
+                            content=f"Permission denied for tool: {tc.name}",
+                            tool_call_id=tc.id,
+                        ))
+                tool_calls = permitted_calls
 
             # Append assistant message with tool calls to history
             assistant_msg = Message(
                 role="assistant",
                 content=content,
-                tool_calls=tool_calls,
-            )
-            history.append(assistant_msg)
+                tool_calls=tool_calls if tool_calls else None,
+            ))
             if session_manager:
-                session_manager.log_message(assistant_msg)
+                session_manager.log_message(
+                    "assistant", content,
+                    tool_calls=tool_calls if tool_calls else None,
+                )
+
+            if not tool_calls:
+                # All tools were denied — continue loop to let LLM retry
+                continue
 
             # Execute tools
             results = await _execute_tools(tool_calls, tools, on_tool_call)
@@ -252,22 +249,23 @@ async def run_agent_loop(
                     role="tool",
                     content=result.content,
                     tool_call_id=result.tool_call_id,
-                )
-                history.append(tool_msg)
+                ))
                 if session_manager:
-                    session_manager.log_message(tool_msg)
+                    session_manager.log_message(
+                        "tool", result.content,
+                        tool_call_id=result.tool_call_id,
+                    )
 
-            # Continue the loop — LLM will see tool results and decide next action
             continue
 
         # No tool calls — this is the final text response
         final_content = content or ""
 
-        # ── Output guards (PII redaction) ──────────────────────────
-        if guards:
-            output_result = guards.check_output(final_content)
-            if output_result.modified_content is not None:
-                final_content = output_result.modified_content
+        # ── Output Guards (PII redaction) ───────────────────────
+        if clause_guards:
+            output_result = clause_guards.check_output(final_content)
+            if output_result.modified_output is not None:
+                final_content = output_result.modified_output
 
         # Stream the final response if requested
         if stream and on_chunk and final_content:
@@ -275,10 +273,9 @@ async def run_agent_loop(
                 await on_chunk(final_content[i:i + 20])
 
         # Append assistant response to history
-        assistant_msg = Message(role="assistant", content=final_content)
-        history.append(assistant_msg)
+        history.append(Message(role="assistant", content=final_content))
         if session_manager:
-            session_manager.log_message(assistant_msg)
+            session_manager.log_message("assistant", final_content)
 
         return AgentResponse(
             content=final_content,
@@ -288,16 +285,13 @@ async def run_agent_loop(
         )
 
     # Max turns reached — return whatever we have
-    max_msg = Message(
-        role="assistant",
-        content="[Reached maximum tool-use turns. Stopping.]",
-    )
-    history.append(max_msg)
+    max_turns_msg = "[Reached maximum tool-use turns. Stopping.]"
+    history.append(Message(role="assistant", content=max_turns_msg))
     if session_manager:
-        session_manager.log_message(max_msg)
+        session_manager.log_message("assistant", max_turns_msg)
 
     return AgentResponse(
-        content="[Reached maximum tool-use turns. Stopping.]",
+        content=max_turns_msg,
         tool_calls_made=all_tool_calls,
         token_usage=total_usage,
         turns_used=turns,
