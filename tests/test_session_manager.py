@@ -104,6 +104,10 @@ class TestSessionManager:
         manager.log_message("user", "msg1")
         manager.log_message("assistant", "msg2")
 
+        # message_count is tracked in memory; flushed every 10 messages or on flush_metadata()
+        assert manager.message_count == 2
+
+        manager.flush_metadata()
         meta_path = manager.session_path / "session.json"
         with open(meta_path) as f:
             meta = json.load(f)

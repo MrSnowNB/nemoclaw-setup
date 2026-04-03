@@ -268,6 +268,13 @@ class TestAgentLoopStreaming:
     async def test_on_chunk_called(self, mock_llm, tool_registry):
         mock_llm.chat_completion.return_value = _make_llm_response(content="Hello streamed!")
 
+        # Mock chat_completion_stream to yield SSE-style chunks
+        async def fake_stream(*args, **kwargs):
+            for word in ["Hello", " streamed", "!"]:
+                yield {"choices": [{"delta": {"content": word}}]}
+
+        mock_llm.chat_completion_stream = fake_stream
+
         on_chunk = AsyncMock()
 
         await run_agent_loop(
@@ -280,4 +287,5 @@ class TestAgentLoopStreaming:
             on_chunk=on_chunk,
         )
 
-        assert on_chunk.call_count > 0
+        assert on_chunk.call_count == 3
+        on_chunk.assert_any_call("Hello")

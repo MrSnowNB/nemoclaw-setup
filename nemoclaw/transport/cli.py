@@ -39,7 +39,7 @@ class CLITransport(Transport):
         """Get user input via prompt_toolkit (supports history, editing)."""
         try:
             # Run prompt_toolkit in a thread since it's synchronous
-            text = await asyncio.get_event_loop().run_in_executor(
+            text = await asyncio.get_running_loop().run_in_executor(
                 None,
                 lambda: self._session.prompt("you> "),
             )

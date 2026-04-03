@@ -75,7 +75,10 @@ class Settings(BaseSettings):
 
     # ── Guards ──────────────────────────────────────────────────────
     guards_enabled: bool = True
-    guards_patterns_path: str = "nemoclaw/guards/patterns.yaml"
+    guards_patterns_path: str = str(Path(__file__).parent / "guards" / "patterns.yaml")
+
+    # ── File Tool Sandbox ────────────────────────────────────────────
+    tools_allowed_dirs: list[str] = []
 
     # ── Context Window ──────────────────────────────────────────────
     max_context_tokens: int = 32768

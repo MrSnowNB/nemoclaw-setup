@@ -1,4 +1,4 @@
-#!/home/mr-snow/alice_cyberland/venv_stable/bin/python3
+#!/usr/bin/env python3
 import sys
 import json
 import argparse

@@ -88,6 +88,10 @@ class SessionManager:
         metadata: dict[str, Any] | None = None,
     ) -> None:
         """Append a message to the JSONL log."""
+        if not self.session_id:
+            raise RuntimeError(
+                "SessionManager: call start_new_session() or resume_session() before log_message()"
+            )
         entry: dict[str, Any] = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "role": role,
@@ -104,19 +108,20 @@ class SessionManager:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
         self.message_count += 1
-        self._update_message_count()
+        if self.message_count % 10 == 0:
+            self.flush_metadata()
 
-    def _write_metadata(self, metadata: dict[str, Any]) -> None:
-        """Write session metadata to session.json."""
-        meta_path = self.session_path / "session.json"
-        with open(meta_path, "w", encoding="utf-8") as f:
-            json.dump(metadata, f, indent=2, ensure_ascii=False)
-
-    def _update_message_count(self) -> None:
-        """Update the message_count in session.json."""
+    def flush_metadata(self) -> None:
+        """Flush the current message_count to session.json."""
         meta_path = self.session_path / "session.json"
         if meta_path.exists():
             with open(meta_path) as f:
                 metadata = json.load(f)
             metadata["message_count"] = self.message_count
             self._write_metadata(metadata)
+
+    def _write_metadata(self, metadata: dict[str, Any]) -> None:
+        """Write session metadata to session.json."""
+        meta_path = self.session_path / "session.json"
+        with open(meta_path, "w", encoding="utf-8") as f:
+            json.dump(metadata, f, indent=2, ensure_ascii=False)

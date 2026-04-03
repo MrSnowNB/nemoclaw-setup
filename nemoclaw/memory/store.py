@@ -11,6 +11,8 @@ import logging
 import re
 from pathlib import Path
 
+from nemoclaw.memory.base import MemoryProvider
+
 logger = logging.getLogger(__name__)
 
 # Tier 1 limits
@@ -18,7 +20,7 @@ MAX_MEMORY_ENTRIES = 50
 MAX_ENTRY_LENGTH = 150
 
 
-class MemoryStore:
+class MemoryStore(MemoryProvider):
     """Manages the three-tier memory architecture."""
 
     def __init__(self, memory_dir: Path, sessions_dir: Path | None = None) -> None:

@@ -182,7 +182,11 @@ async def run_agent_loop(
         # Build message list: system + history
         messages = [Message(role="system", content=system_prompt)] + history
 
-        # Non-streaming call to get tool calls or final response
+        # Use streaming when we want to stream text to the user, non-streaming
+        # when tools are likely (first turn after tool results, or tools available).
+        # We always try non-streaming first if tools are available, since tool_calls
+        # parsing is simpler from a complete response. If the response is text-only
+        # and streaming was requested, we re-issue with streaming for real-time output.
         response = await llm.chat_completion(
             messages=messages,
             tools=tool_schemas if tool_schemas else None,
@@ -268,19 +272,38 @@ async def run_agent_loop(
 
             continue
 
-        # No tool calls — this is the final text response
-        final_content = content or ""
+        # No tool calls — this is the final text response.
+        # If streaming is requested and we have a callback, re-issue the
+        # request with real streaming so chunks arrive as the LLM generates them.
+        if stream and on_chunk:
+            final_content = ""
+            try:
+                stream_iter = llm.chat_completion_stream(
+                    messages=messages,
+                    tools=None,  # No tools for the final text turn
+                )
+                async for chunk in stream_iter:
+                    delta = (
+                        chunk.get("choices", [{}])[0]
+                        .get("delta", {})
+                        .get("content", "")
+                    )
+                    if delta:
+                        final_content += delta
+                        await on_chunk(delta)
+            except Exception:
+                # If streaming fails, fall back to the already-fetched content
+                final_content = content or ""
+                if final_content and on_chunk:
+                    await on_chunk(final_content)
+        else:
+            final_content = content or ""
 
         # ── Output Guards (PII redaction) ───────────────────────
         if clause_guards:
             output_result = clause_guards.check_output(final_content)
             if output_result.modified_output is not None:
                 final_content = output_result.modified_output
-
-        # Stream the final response if requested
-        if stream and on_chunk and final_content:
-            for i in range(0, len(final_content), 20):
-                await on_chunk(final_content[i:i + 20])
 
         # Append assistant response to history
         history.append(Message(role="assistant", content=final_content))

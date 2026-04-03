@@ -188,6 +188,7 @@ async def run(args: argparse.Namespace) -> None:
                 history.clear()
                 continue
             if user_input == "/history":
+                cli_transport._show_history()
                 continue
             if user_input == "/tools":
                 cli_transport.show_tools(list(tool_registry.tools.keys()))

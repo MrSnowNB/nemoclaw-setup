@@ -1,18 +1,19 @@
 import json
 import time
 import os
-import glob
 from pathlib import Path
+
 
 def find_latest_session():
     session_dir = os.environ.get(
         "OPENCLAW_SESSIONS_DIR",
         str(Path.home() / ".nemoclaw" / "sessions"),
     )
-    files = glob.glob(os.path.join(session_dir, "*.jsonl"))
+    files = list(Path(session_dir).rglob("messages.jsonl"))
     if not files:
         return None
-    return max(files, key=os.path.getmtime)
+    return max(files, key=lambda f: f.stat().st_mtime)
+
 
 def monitor_alice(follow=False):
     """
@@ -21,10 +22,10 @@ def monitor_alice(follow=False):
     """
     session_file = find_latest_session()
     if not session_file:
-        print("❌ No session files found.")
+        print("No session files found.")
         return
 
-    print(f"📡 [VIGILANCE BRIDGE] Monitoring {session_file}...")
+    print(f"Monitoring {session_file}...")
 
     with open(session_file, "r") as f:
         # Initial read of existing history
@@ -41,35 +42,45 @@ def monitor_alice(follow=False):
                     continue
                 process_line(line)
 
+
 def process_line(line):
+    line = line.strip()
+    if not line:
+        return
     try:
         data = json.loads(line)
-        if "type" in data and data["type"] == "message":
-            role = data.get("role", "unknown").upper()
-            content = data.get("content", "")
-            timestamp = data.get("timestamp", "")
+    except json.JSONDecodeError:
+        return
 
-            # Formatting logic
-            color = "\033[94m" # Blue for user
-            if role == "ASSISTANT":
-                color = "\033[95m" # Magenta for Alice
-            elif role == "SIGNAL":
-                color = "\033[93m" # Yellow for Engineering signals
+    role = data.get("role", "")
+    content = data.get("content", "")
+    timestamp = data.get("timestamp", "")
 
-            print(f"{color}[{timestamp}] {role}: {content}\033[0m")
+    if not role:
+        return
 
-        elif "type" in data and data["type"] == "tool_call":
-            tool = data.get("tool", "unknown")
-            args = data.get("args", {})
-            print(f"\033[92m[TOOL_CALL] {tool}({args})\033[0m")
+    # Formatting logic
+    role_upper = role.upper()
+    color = "\033[94m"  # Blue for user
+    if role_upper == "ASSISTANT":
+        color = "\033[95m"  # Magenta for assistant
+    elif role_upper == "TOOL":
+        color = "\033[92m"  # Green for tool
+    elif role_upper == "SYSTEM":
+        color = "\033[93m"  # Yellow for system
 
-        elif "type" in data and data["type"] == "tool_result":
-            tool = data.get("tool", "unknown")
-            status = data.get("status", "unknown")
-            print(f"\033[92m[TOOL_RESULT] {tool} -> {status}\033[0m")
+    # Handle tool calls in the entry
+    tool_calls = data.get("tool_calls")
+    if tool_calls:
+        for tc in tool_calls:
+            name = tc.get("name", "unknown")
+            args = tc.get("arguments", {})
+            print(f"\033[92m[{timestamp}] TOOL_CALL: {name}({args})\033[0m")
+    elif data.get("tool_call_id"):
+        print(f"\033[92m[{timestamp}] TOOL_RESULT: {content[:200]}\033[0m")
+    else:
+        print(f"{color}[{timestamp}] {role_upper}: {content}\033[0m")
 
-    except:
-        pass
 
 if __name__ == "__main__":
     import sys

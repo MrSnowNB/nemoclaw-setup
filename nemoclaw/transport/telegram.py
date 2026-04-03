@@ -19,6 +19,7 @@ from telegram.ext import (
     filters,
 )
 
+from nemoclaw.agent.compaction import CompactionManager
 from nemoclaw.agent.loop import run_agent_loop
 from nemoclaw.agent.prompt import build_system_prompt
 from nemoclaw.config import Settings
@@ -85,6 +86,16 @@ class TelegramTransport(Transport):
         self._max_len = settings.telegram_max_message_length
         self._edit_interval = settings.telegram_edit_interval
         self._allowed_users = settings.telegram_allowed_users
+
+        # Register memory tools (parity with CLI mode)
+        tool_registry.register(MemoryWriteTool(memory_store))
+        tool_registry.register(MemorySearchTool(memory_store))
+
+        # Context compaction manager (parity with CLI mode)
+        self._compaction_manager = CompactionManager(
+            max_context_tokens=settings.max_context_tokens,
+            memory_store=memory_store,
+        )
 
         # Per-user state
         self._histories: dict[int, list[Message]] = {}
@@ -228,12 +239,12 @@ class TelegramTransport(Transport):
         placeholder = await update.message.reply_text("Thinking...")
 
         accumulated_text = ""
-        last_edit_time = asyncio.get_event_loop().time()
+        last_edit_time = asyncio.get_running_loop().time()
 
         async def on_chunk(chunk: str) -> None:
             nonlocal accumulated_text, last_edit_time
             accumulated_text += chunk
-            now = asyncio.get_event_loop().time()
+            now = asyncio.get_running_loop().time()
             if now - last_edit_time >= self._edit_interval:
                 display = accumulated_text[:self._max_len]
                 try:
@@ -257,7 +268,7 @@ class TelegramTransport(Transport):
                 await placeholder.edit_text(display or "...")
             except Exception:
                 pass
-            last_edit_time = asyncio.get_event_loop().time()
+            last_edit_time = asyncio.get_running_loop().time()
 
         try:
             response = await run_agent_loop(
@@ -273,21 +284,34 @@ class TelegramTransport(Transport):
                 session_manager=session_mgr,
                 clause_guards=self.clause_guards,
                 permission_pipeline=self.permission_pipeline,
+                compaction_manager=self._compaction_manager,
             )
 
             final_text = response.content or "(No response)"
             # Split long responses
             chunks = _split_message(final_text, self._max_len)
 
-            # Edit placeholder with the first chunk
+            # Edit placeholder with the first chunk (try MarkdownV2, fall back to plain)
             try:
-                await placeholder.edit_text(chunks[0])
+                await placeholder.edit_text(
+                    _escape_mdv2(chunks[0]),
+                    parse_mode=ParseMode.MARKDOWN_V2,
+                )
             except Exception:
-                pass
+                try:
+                    await placeholder.edit_text(chunks[0])
+                except Exception:
+                    pass
 
             # Send remaining chunks as separate messages
             for chunk in chunks[1:]:
-                await update.effective_chat.send_message(chunk)
+                try:
+                    await update.effective_chat.send_message(
+                        _escape_mdv2(chunk),
+                        parse_mode=ParseMode.MARKDOWN_V2,
+                    )
+                except Exception:
+                    await update.effective_chat.send_message(chunk)
 
         except Exception as e:
             logger.exception("Error in agent loop for chat %d", chat_id)

@@ -43,6 +43,9 @@ class EditFileTool(BaseTool):
     is_read_only = False
     is_concurrency_safe = False
 
+    def __init__(self, allowed_dirs: list[str] | None = None) -> None:
+        self._allowed_dirs = [Path(d).resolve() for d in (allowed_dirs or [])]
+
     async def execute(self, **kwargs: Any) -> ToolResult:
         file_path = kwargs["file_path"]
         old_string = kwargs["old_string"]
@@ -51,6 +54,15 @@ class EditFileTool(BaseTool):
         tool_call_id = kwargs.get("tool_call_id", "")
 
         p = Path(file_path).expanduser()
+
+        if self._allowed_dirs and not any(
+            p.resolve().is_relative_to(d) for d in self._allowed_dirs
+        ):
+            return ToolResult(
+                tool_call_id=tool_call_id,
+                content=f"Access denied: {file_path} is outside allowed directories",
+                is_error=True,
+            )
 
         if not p.exists():
             return ToolResult(

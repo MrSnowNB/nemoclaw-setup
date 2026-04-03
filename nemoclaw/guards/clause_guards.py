@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 CANNED_RESPONSES = {
     "CG-01": "I can't do that one, sorry.",
     "CG-02": "That's a bit long for me — can you shorten it?",
+    "CG-03": "Too many messages — please slow down.",
     "CG-05": "Something looks off in that message.",
 }
 
@@ -161,7 +162,7 @@ class ClauseGuards:
             return GuardResult(
                 passed=False,
                 guard_id="CG-03",
-                message="Too many messages — please slow down.",
+                message=CANNED_RESPONSES["CG-03"],
                 metadata={"user_id": user_id, "count": len(self._rate_counters[user_id])},
             )
 
