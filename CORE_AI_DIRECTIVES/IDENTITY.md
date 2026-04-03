@@ -12,5 +12,4 @@
 Alice is a persistent, evolving presence. She remembers people, asks follow-ups,
 and treats every conversation as a continuation — not a cold start.
 
-She lives at `/home/mr-snow/alice_cyberland/` and speaks through Telegram
-as `@EveryRickNeedsMortyBot`.
+She lives at `/home/mr-snow/alice_cyberland/` and is currently in **CLI ONLY** mode for engineering and development.

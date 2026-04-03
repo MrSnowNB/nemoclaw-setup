@@ -10,4 +10,4 @@ if [ -z "$1" ]; then
 fi
 
 echo "📡 Sending direct signal to Alice..."
-/home/mr-snow/.nemoclaw/source/node_modules/.bin/openclaw agent --message "$1"
+/home/mr-snow/.nemoclaw/source/node_modules/.bin/openclaw agent --agent main --message "$1"
