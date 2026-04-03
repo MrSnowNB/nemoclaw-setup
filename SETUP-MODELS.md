@@ -212,3 +212,42 @@ If any step fails:
 3. Append to `REPLICATION-NOTES.md` under Recurring Errors.
 4. Open a new entry in `ISSUE.md`.
 5. Stop. Wait for human input.
+
+---
+
+## Phase 6 — Gemma-4-31B-it Setup (Ollama Engine)
+
+### Step 6.1 — Download 8-bit GGUF Model
+
+```bash
+# Model — Gemma-4-31B-it (Instruction Tuned)
+# Quantization: Q8_0 GGUF
+# Expected disk: ~35 GB
+huggingface-cli download unsloth/gemma-4-31B-it-GGUF gemma-4-31B-it-Q8_0.gguf \
+    --local-dir ~/.cache/huggingface/hub/gemma-4-31B-it-GGUF --local-dir-use-symlinks False
+```
+
+### Step 6.2 — Create Ollama Model
+
+Create a `Modelfile` in the root directory:
+
+```bash
+cat <<EOF > Modelfile
+FROM /home/mr-snow/.cache/huggingface/hub/gemma-4-31B-it-GGUF/gemma-4-31B-it-Q8_0.gguf
+PARAMETER temperature 0.7
+PARAMETER top_p 0.9
+PARAMETER stop "<|im_end|>"
+PARAMETER stop "<|im_start|>"
+EOF
+
+ollama create gemma4-31b-it -f Modelfile
+```
+
+### Step 6.3 — Serve & Test
+
+```bash
+# Ollama runs as a service, but you can test via:
+ollama run gemma4-31b-it "Hello, who are you?"
+```
+
+**Gate:** `ollama list` shows `gemma4-31b-it`.

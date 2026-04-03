@@ -1,0 +1,12 @@
+FROM /home/mr-snow/.cache/huggingface/hub/gemma-4-31B-it-GGUF/gemma-4-31B-it-Q8_0.gguf
+PARAMETER temperature 0.7
+PARAMETER top_p 0.9
+PARAMETER stop "<|im_end|>"
+PARAMETER stop "<|im_start|>"
+# Native support for the thinking channel
+TEMPLATE """<|im_start|>system
+{{ .System }}<|im_end|>
+<|im_start|>user
+{{ .Prompt }}<|im_end|>
+<|im_start|>assistant
+"""
