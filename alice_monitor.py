@@ -25,13 +25,13 @@ def monitor_alice(follow=False):
         return
 
     print(f"📡 [VIGILANCE BRIDGE] Monitoring {session_file}...")
-    
+
     with open(session_file, "r") as f:
         # Initial read of existing history
         lines = f.readlines()
         for line in lines:
             process_line(line)
-        
+
         if follow:
             # Live monitoring mode
             while True:
@@ -48,26 +48,26 @@ def process_line(line):
             role = data.get("role", "unknown").upper()
             content = data.get("content", "")
             timestamp = data.get("timestamp", "")
-            
+
             # Formatting logic
             color = "\033[94m" # Blue for user
             if role == "ASSISTANT":
                 color = "\033[95m" # Magenta for Alice
             elif role == "SIGNAL":
                 color = "\033[93m" # Yellow for Engineering signals
-                
+
             print(f"{color}[{timestamp}] {role}: {content}\033[0m")
-            
+
         elif "type" in data and data["type"] == "tool_call":
             tool = data.get("tool", "unknown")
             args = data.get("args", {})
             print(f"\033[92m[TOOL_CALL] {tool}({args})\033[0m")
-            
+
         elif "type" in data and data["type"] == "tool_result":
             tool = data.get("tool", "unknown")
             status = data.get("status", "unknown")
             print(f"\033[92m[TOOL_RESULT] {tool} -> {status}\033[0m")
-            
+
     except:
         pass
 

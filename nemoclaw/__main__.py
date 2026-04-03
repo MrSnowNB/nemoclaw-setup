@@ -6,7 +6,6 @@ import argparse
 import asyncio
 import logging
 import sys
-from pathlib import Path
 
 from nemoclaw.agent.compaction import CompactionManager
 from nemoclaw.agent.hooks import post_response_hook, pre_response_hook
@@ -114,9 +113,8 @@ async def run(args: argparse.Namespace) -> None:
         tool_registry.register(MemorySearchTool(memory_store))
 
     # ── Clause Guards ───────────────────────────────────────────────
-    patterns_path = Path("nemoclaw/guards/patterns.yaml")
     clause_guards = ClauseGuards(
-        patterns_path=patterns_path,
+        patterns_path=settings.guards_patterns_path,
         enabled=settings.guards_enabled,
     )
 
@@ -195,9 +193,7 @@ async def run(args: argparse.Namespace) -> None:
                 cli_transport.show_tools(list(tool_registry.tools.keys()))
                 continue
 
-            cli_transport._conversation_history.append(
-                {"role": "user", "content": user_input},
-            )
+            cli_transport.add_user_message(user_input)
 
             await pre_response_hook(user_input)
 

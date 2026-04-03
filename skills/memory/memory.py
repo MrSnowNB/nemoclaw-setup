@@ -45,26 +45,26 @@ def learn_fact(fact, category):
     target = USER_FILE if category == "personal" else MEMORY_FILE
     if not target.exists():
         return f"Error: {target} not found."
-    
+
     timestamp = datetime.now().strftime("%Y-%m-%d")
     line = f"\n- [{timestamp}] {fact}\n"
-    
+
     # Simple append to 'Known Facts' or 'History' section
     with open(target, "a") as f:
         f.write(line)
-    
+
     return f"Successfully learned: {fact} (Category: {category})"
 
 def recount_session(summary):
     if not RECOUNT_FILE.parent.exists():
         RECOUNT_FILE.parent.mkdir(parents=True, exist_ok=True)
-    
+
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
     entry = f"\n### Session Recount: {timestamp}\n{summary}\n---\n"
-    
+
     with open(RECOUNT_FILE, "a") as f:
         f.write(entry)
-    
+
     return "Session recount successfully archived."
 
 if __name__ == "__main__":

@@ -113,6 +113,10 @@ class CLITransport(Transport):
             else:
                 self.console.print(f"[green]assistant>[/green] {content}")
 
+    def add_user_message(self, content: str) -> None:
+        """Record a user message in the local conversation display history."""
+        self._conversation_history.append({"role": "user", "content": content})
+
     def show_tools(self, tool_names: list[str]) -> None:
         """Display available tools."""
         self.console.print("\n[bold]Available tools:[/bold]")

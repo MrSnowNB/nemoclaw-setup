@@ -182,10 +182,6 @@ async def run_agent_loop(
         # Build message list: system + history
         messages = [Message(role="system", content=system_prompt)] + history
 
-        if stream and turns == 1:
-            # First turn — try streaming for the initial response
-            pass
-
         # Non-streaming call to get tool calls or final response
         response = await llm.chat_completion(
             messages=messages,
@@ -208,7 +204,22 @@ async def run_agent_loop(
             tool_calls = _parse_tool_calls(raw_tool_calls)
             all_tool_calls.extend(tool_calls)
 
+            # Append assistant message with ALL tool calls first (API requires
+            # the assistant message to precede any tool-role responses).
+            assistant_msg = Message(
+                role="assistant",
+                content=content,
+                tool_calls=tool_calls,
+            )
+            history.append(assistant_msg)
+            if session_manager:
+                session_manager.log_message(
+                    "assistant", content,
+                    tool_calls=tool_calls,
+                )
+
             # ── Permission Check ────────────────────────────────
+            denied_calls: list[ToolCall] = []
             if permission_pipeline:
                 permitted_calls = []
                 for tc in tool_calls:
@@ -217,25 +228,22 @@ async def run_agent_loop(
                         permitted_calls.append(tc)
                     else:
                         logger.warning("Permission denied for tool: %s", tc.name)
-                        history.append(Message(
-                            role="tool",
-                            content=f"Permission denied for tool: {tc.name}",
-                            tool_call_id=tc.id,
-                        ))
+                        denied_calls.append(tc)
                 tool_calls = permitted_calls
 
-            # Append assistant message with tool calls to history
-            assistant_msg = Message(
-                role="assistant",
-                content=content,
-                tool_calls=tool_calls if tool_calls else None,
-            )
-            history.append(assistant_msg)
-            if session_manager:
-                session_manager.log_message(
-                    "assistant", content,
-                    tool_calls=tool_calls if tool_calls else None,
+            # Add denial messages as tool results (after assistant message)
+            for tc in denied_calls:
+                denial_msg = Message(
+                    role="tool",
+                    content=f"Permission denied for tool: {tc.name}",
+                    tool_call_id=tc.id,
                 )
+                history.append(denial_msg)
+                if session_manager:
+                    session_manager.log_message(
+                        "tool", f"Permission denied for tool: {tc.name}",
+                        tool_call_id=tc.id,
+                    )
 
             if not tool_calls:
                 # All tools were denied — continue loop to let LLM retry
