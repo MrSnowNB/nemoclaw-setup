@@ -1,0 +1,153 @@
+{
+  "meta": {
+    "lastTouchedVersion": "2026.4.1",
+    "lastTouchedAt": "2026-04-03T05:06:11.617Z"
+  },
+  "wizard": {
+    "lastRunAt": "2026-04-03T04:59:25.041Z",
+    "lastRunVersion": "2026.4.1",
+    "lastRunCommand": "doctor",
+    "lastRunMode": "local"
+  },
+  "models": {
+    "mode": "merge",
+    "providers": {
+      "forge": {
+        "baseUrl": "http://127.0.0.1:18080/v1",
+        "apiKey": "alice-nexus",
+        "api": "openai-completions",
+        "models": [
+          {
+            "id": "qwen3.5:35b",
+            "name": "qwen3.5:35b",
+            "reasoning": true,
+            "input": [
+              "text"
+            ],
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0
+            },
+            "contextWindow": 32768
+          }
+        ]
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "forge/qwen3.5:35b"
+      },
+      "compaction": {
+        "mode": "safeguard"
+      },
+      "timeoutSeconds": 600,
+      "memorySearch": {
+        "enabled": false
+      }
+    },
+    "list": [
+      {
+        "id": "main",
+        "identity": {
+          "name": "Alice",
+          "emoji": "🤖",
+          "theme": "Personal AI companion"
+        }
+      }
+    ]
+  },
+  "tools": {
+    "allow": [
+      "exec",
+      "bash",
+      "tmux",
+      "memory",
+      "web-fetch",
+      "duckduckgo",
+      "google-search",
+      "ollama_web_search",
+      "ollama_web_fetch",
+      "weather",
+      "clock",
+      "stock",
+      "recipe",
+      "video-frames",
+      "apple-map-search"
+    ],
+    "web": {
+      "search": {
+        "enabled": false
+      },
+      "fetch": {
+        "enabled": false
+      }
+    }
+  },
+  "commands": {
+    "native": "auto",
+    "nativeSkills": "auto",
+    "restart": true,
+    "ownerDisplay": "raw"
+  },
+  "channels": {
+    "telegram": {
+      "enabled": true,
+      "dmPolicy": "open",
+      "allowFrom": [
+        "*"
+      ],
+      "groupPolicy": "open",
+      "streaming": "partial",
+      "accounts": {
+        "default": {
+          "name": "Alice",
+          "dmPolicy": "open",
+          "botToken": "8603628145:AAGNlutpIRIHWJG71Y_knrf8CGTGpd8PMzk",
+          "groupPolicy": "open",
+          "streaming": "partial",
+          "allowFrom": [
+            "*"
+          ]
+        }
+      },
+      "configWrites": true,
+      "linkPreview": true
+    }
+  },
+  "gateway": {
+    "mode": "local",
+    "bind": "lan",
+    "controlUi": {
+      "allowedOrigins": [
+        "http://localhost:18789",
+        "http://127.0.0.1:18789"
+      ]
+    },
+    "auth": {
+      "mode": "token",
+      "token": "6ecb7af308485d998fbdfdeb40451e7593ace861d3e6d42b"
+    }
+  },
+  "plugins": {
+    "allow": [
+      "openclaw-web-search",
+      "telegram"
+    ],
+    "entries": {
+      "openclaw-web-search": {
+        "enabled": true
+      }
+    },
+    "installs": {
+      "openclaw-web-search": {
+        "source": "npm",
+        "spec": "@ollama/openclaw-web-search",
+        "installPath": "/home/mr-snow/.openclaw/extensions/openclaw-web-search"
+      }
+    }
+  }
+}
