@@ -5,4 +5,4 @@
 # ==========================================
 
 echo "📡 Connecting to Alice (Clawbot Agent)..."
-/home/mr-snow/.nemoclaw/source/node_modules/.bin/openclaw tui --agent main
+/home/mr-snow/.nemoclaw/source/node_modules/.bin/openclaw tui --session main
