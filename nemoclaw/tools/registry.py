@@ -24,7 +24,7 @@ class ToolRegistry:
         return [t.to_openai_schema() for t in self.tools.values()]
 
     def register_defaults(self) -> None:
-        """Register all built-in tools."""
+        """Register all built-in tools (not including memory tools, which need a store)."""
         from nemoclaw.tools.bash import BashTool
         from nemoclaw.tools.edit_file import EditFileTool
         from nemoclaw.tools.glob_tool import GlobTool

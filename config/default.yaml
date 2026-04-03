@@ -24,3 +24,25 @@ max_turns: 25
 
 # Transport: cli or telegram
 transport: "cli"
+
+# --- Phase 4+5 additions ---
+
+# Permissions: tool call authorization
+permissions_always_allow:
+  - read_file
+  - glob
+  - web_fetch
+  - memory_search
+permissions_always_deny: []
+permissions_always_ask:
+  - bash
+permissions_auto_allow_after_n: 3
+
+# Guards: clause guards (CG-01 through CG-05)
+guards_enabled: true
+guards_patterns_path: null  # null = use built-in patterns.yaml
+guards_max_message_length: 4096
+guards_rate_limit: 20  # messages per minute
+
+# Context compaction
+max_context_tokens: 32768

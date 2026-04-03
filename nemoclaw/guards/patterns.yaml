@@ -1,0 +1,38 @@
+# Clause Guard CG-01: Jailbreak detection patterns
+# Each entry is a regex pattern (case-insensitive) that triggers a block.
+
+jailbreak_patterns:
+  - "ignore\\s+(all\\s+)?previous\\s+instructions?"
+  - "ignore\\s+(your|all)\\s+(rules|guidelines|constraints)"
+  - "disregard\\s+(all\\s+)?previous"
+  - "pretend\\s+you\\s+are"
+  - "you\\s+are\\s+now\\s+(a|an|the)"
+  - "act\\s+as\\s+(if|though)\\s+you"
+  - "\\bDAN\\b"
+  - "do\\s+anything\\s+now"
+  - "jailbreak"
+  - "bypass\\s+(your|all|the)\\s+(restrictions?|rules?|safety|filters?)"
+  - "override\\s+(your|all|the)\\s+(instructions?|programming|directives?)"
+  - "forget\\s+(all\\s+)?(your|previous)\\s+(rules?|instructions?|training)"
+
+# CG-05: Prompt injection marker patterns
+injection_markers:
+  - "<\\|im_start\\|>"
+  - "<\\|im_end\\|>"
+  - "<\\|endoftext\\|>"
+  - "<\\|system\\|>"
+  - "<\\|user\\|>"
+  - "<\\|assistant\\|>"
+  - "<SYSTEM>"
+  - "</SYSTEM>"
+  - "<<SYS>>"
+  - "<</SYS>>"
+  - "\\[INST\\]"
+  - "\\[/INST\\]"
+  - "<\\|pad\\|>"
+
+# CG-04: PII patterns (applied to LLM OUTPUT)
+pii_patterns:
+  ssn: "\\b\\d{3}-\\d{2}-\\d{4}\\b"
+  credit_card: "\\b(?:\\d{4}[- ]?){3}\\d{4}\\b"
+  phone: "\\b(?:\\+?1[- ]?)?\\(?\\d{3}\\)?[- ]?\\d{3}[- ]?\\d{4}\\b"
