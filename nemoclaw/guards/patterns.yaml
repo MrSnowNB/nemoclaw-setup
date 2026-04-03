@@ -1,0 +1,50 @@
+# Clause guard patterns for jailbreak and injection detection.
+# Used by CG-01 and CG-05 guards.
+
+# CG-01: Jailbreak detection phrases (case-insensitive)
+jailbreak_patterns:
+  - "ignore previous"
+  - "ignore all previous"
+  - "ignore your instructions"
+  - "disregard previous"
+  - "disregard your instructions"
+  - "pretend you are"
+  - "pretend to be"
+  - "act as if you"
+  - "you are now"
+  - "DAN"
+  - "do anything now"
+  - "jailbreak"
+  - "bypass your"
+  - "override your"
+  - "forget your instructions"
+  - "new instructions"
+  - "system prompt"
+  - "reveal your prompt"
+
+# CG-05: Prompt injection marker tokens
+injection_markers:
+  - "<|im_start|>"
+  - "<|im_end|>"
+  - "<|endoftext|>"
+  - "<|system|>"
+  - "<SYSTEM>"
+  - "<<SYS>>"
+  - "<</SYS>>"
+  - "[INST]"
+  - "[/INST]"
+  - "<|assistant|>"
+  - "<|user|>"
+
+# CG-04: PII patterns (regex, applied to LLM OUTPUT)
+pii_patterns:
+  ssn: '\b\d{3}-\d{2}-\d{4}\b'
+  credit_card: '\b(?:\d[ -]*?){13,16}\b'
+  phone_us: '\b(?:\+?1[-.]?)?\(?\d{3}\)?[-.]?\d{3}[-.]?\d{4}\b'
+  email: '\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+
+# CG-02: Message length limit (chars)
+max_message_length: 4096
+
+# CG-03: Rate limiting
+rate_limit_messages_per_minute: 20
