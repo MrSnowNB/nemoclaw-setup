@@ -1,74 +1,61 @@
 # 🤖 Alice: Capabilities & User Guide
 
-Alice is a high-performance agentic assistant integrated with your local system and the web. This guide serves as a reference for her available tools, their options, and how to command her effectively.
+Alice is a high-performance agentic assistant integrated with your local system, the cloud, and specialized AI stacks. This guide serves as the definitive reference for her tools and automated patterns.
 
 ---
 
-## 🐚 1. System & Terminal (CLI Focus)
+## 📡 1. Network & External Access
 
-These tools allow Alice to interact directly with your Linux environment.
+- **Web Search & Fetch:** Comprehensive information retrieval (DuckDuckGo, Google, Serper).
+- **Weather Info:** Real-time atmospheric forecasts via `wttr.in`.
+- **Content Extraction:** Deep reading of URLs and HTML-to-Markdown summarization.
 
-### 🖥️ `shell-command`
-Allows Alice to execute bash commands.
-- **Usage:** "Alice, check the disk space," or "Alice, find all .log files in /tmp and delete them."
-- **Autonomy:** She can run single commands or complex piped scripts.
-- **Safety:** She inherits your user permissions. Exercise caution with destructive prompts.
+## 📁 2. File & Workspace Operations
 
-### 🧵 `tmux`
-Remote-control for terminal sessions.
-- **Usage:** "Alice, start a new tmux session named 'monitor' and run htop," or "Alice, check the output of the 'inference' pane."
-- **Pro-Tip:** Use this for long-running tasks you want to check on later via Telegram.
+- **Read/Write:** Full management of text, code, and image files.
+- **Smart Edit:** Targeted line replacements and code refactoring.
+- **Auto-Directory:** Automatic creation and recursive management of file structures.
+- **Self-Modification:** Ability to evolve `IDENTITY.md` and `MEMORY.md` in the workspace.
 
-### 📁 `workspace`
-Persistent memory and file management.
-- **Usage:** "Alice, what do you remember about our vibe?" or "Alice, update your identity to reflect that I am a Senior Dev."
-- **Files:** Primarily manages `~/.openclaw/workspace/IDENTITY.md` and `MEMORY.md`.
+## 🐚 3. System Commands (CLI Focus)
 
----
+- **Bash Execution:** Direct shell access with background job support.
+- **Long-Running Processes:** Monitoring and state preservation for dev tasks.
+- **PTY Support:** Interaction with terminal UIs and TUI-based tools.
+- **ElevenLabs TTS:** Voice synthesis and audio-visual sync mapping.
 
-## 🌐 2. Web & Research
+## 🤖 4. Session & Agent Management
 
-Alice uses these to fetch real-time information from the outside world.
+- **Orchestration:** List, send, and monitor high-concurrency tool sessions.
+- **Sub-Agents:** Spawn and steer specialized workers for sub-tasks.
+- **Soul/Persona:** Steerable agent identities (e.g., Senior Dev, Creative, Debugger).
 
-### 🦆 `duckduckgo` / `google-search`
-Standard web searching.
-- **Options:** You can specify `region` (e.g., "in the UK") or `time` (e.g., "past 24 hours").
-- **Usage:** "Alice, find the latest news on NVIDIA H200 availability."
+## 🎯 5. Task Automation & Skills
 
-### 🔗 `web-fetch`
-"Reading" specific URLs.
-- **Usage:** "Alice, read this article and summarize the key points: [URL]."
-- **Capabilities:** Can handle HTML-to-Markdown conversion for clean reading.
+- **`video-frames`**: Extraction and analysis via `ffmpeg`.
+- **`ClawFlow`**: Complex multi-step workflow orchestration patterns.
+- **`healthcheck`**: Network diagnostics and security hardening.
+- **`node-connect`**: IoT and device connection troubleshooting.
+- **`skill-creator`**: Self-improvement and new skill generation.
 
-### 🗺️ `apple-map-search`
-Spatial and location queries.
-- **Usage:** "Alice, find coffee shops near me."
+## 🎨 6. Canvas & UI Presentation
 
----
+- **UI Snapshot:** Take snapshots of rendered interfaces.
+- **DOM Manipulation:** Evaluate JS and navigate node trees in real-time.
+- **Interactive UI:** Present or hide Canvas elements for user guidance.
 
-## 📊 3. Utilities & Media
+## 📱 7. Messaging & Connectivity
 
-### ☔ `weather`
-Real-time atmospheric conditions.
-- **Usage:** "Alice, what's the weather like?" or "Alice, should I wear a jacket in New York today?"
-- **Backend:** Uses `wttr.in`. No API key needed.
-
-### 🎬 `video-frames`
-Visual analysis of video files.
-- **Usage:** "Alice, look at this video and tell me what color the car is."
-- **Note:** She extracts frames and passes them to her vision-capable brain.
-
-### 📈 `stock`
-Market data.
-- **Usage:** "Alice, how is NVDA performing today?"
+- **Cross-Platform:** Telegram, WhatsApp, Discord, Signal, Slack, and more.
+- **Interaction:** Polls, reactions, threading, and interactive button support.
 
 ---
 
 ## 💡 Pro-Tips for Prompting Alice
 
-1.  **Be Explicit about Tools:** If you want a terminal command specifically, say "Alice, use the shell to..."
-2.  **Chaining:** You can ask for multiple things: "Alice, check the weather, then find a news article about it and summarize it for me."
-3.  **Self-Correction:** If she fails an edit, you can tell her: "Alice, you don't have permission for that file, try checking your workspace directory instead."
+1.  **Terminal Power:** Use "Alice, spin up a tmux session for X" to keep a process running after you disconnect.
+2.  **Context Loading:** Say "Alice, fetch the docs at [URL] and tell me how to implement Y."
+3.  **Visual Input:** If you send a video, Alice can use the `video-frames` skill to "see" what's inside.
 
 ---
 *Last Updated: 2026-04-02*
