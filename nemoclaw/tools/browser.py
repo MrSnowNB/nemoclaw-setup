@@ -15,8 +15,10 @@ class BrowserTool(BaseTool):
 
     name = "browser"
     description = (
-        "A full headless browser (Playwright) for complex web navigation, "
-        "extracting content from SPAs, and taking screenshots."
+        "A full headless browser (Playwright) for complex web navigation. "
+        "Use 'navigate' to check if a page loads and get its title. "
+        "Use 'extract' to read the full text content of the page for gathering information and reporting back. "
+        "Use 'screenshot' to confirm visual rendering."
     )
     parameters: dict[str, Any] = {
         "type": "object",
