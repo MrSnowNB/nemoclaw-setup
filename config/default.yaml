@@ -25,6 +25,12 @@ max_turns: 25
 # Transport: cli or telegram
 transport: "cli"
 
+# Telegram settings
+telegram_token: ""  # Set via NEMOCLAW_TELEGRAM_TOKEN env var
+telegram_allowed_users: ["*"]
+telegram_max_message_length: 4096
+telegram_edit_interval: 1.0
+
 # Permissions — layered allow/deny/ask for tool calls
 permissions_always_allow:
   - read_file

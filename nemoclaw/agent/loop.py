@@ -19,7 +19,7 @@ import logging
 from typing import Any, Callable, Coroutine
 
 from nemoclaw.agent.compaction import CompactionManager
-from nemoclaw.guards.clause_guards import ClauseGuardRunner
+from nemoclaw.guards.clause_guards import ClauseGuards
 from nemoclaw.llm.base import LLMProvider
 from nemoclaw.models import AgentResponse, Message, ToolCall, ToolResult, TokenUsage
 from nemoclaw.permissions.pipeline import PermissionPipeline
@@ -229,7 +229,8 @@ async def run_agent_loop(
                 role="assistant",
                 content=content,
                 tool_calls=tool_calls if tool_calls else None,
-            ))
+            )
+            history.append(assistant_msg)
             if session_manager:
                 session_manager.log_message(
                     "assistant", content,
@@ -249,7 +250,8 @@ async def run_agent_loop(
                     role="tool",
                     content=result.content,
                     tool_call_id=result.tool_call_id,
-                ))
+                )
+                history.append(tool_msg)
                 if session_manager:
                     session_manager.log_message(
                         "tool", result.content,

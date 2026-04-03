@@ -69,14 +69,6 @@ def parse_args() -> argparse.Namespace:
         "--verbose", "-v", action="store_true",
         help="Enable debug logging",
     )
-    parser.add_argument(
-        "--continue", dest="continue_session", action="store_true",
-        help="Resume the most recent session",
-    )
-    parser.add_argument(
-        "--resume", default=None, metavar="SESSION_ID",
-        help="Resume a specific session by ID",
-    )
     return parser.parse_args()
 
 
@@ -118,29 +110,8 @@ async def run(args: argparse.Namespace) -> None:
     tool_registry = ToolRegistry()
     if not args.no_tools:
         tool_registry.register_defaults()
-        # Register memory tools
         tool_registry.register(MemoryWriteTool(memory_store))
         tool_registry.register(MemorySearchTool(memory_store))
-
-    # ── Session Manager ─────────────────────────────────────────────
-    session_mgr = SessionManager(
-        sessions_dir=settings.session_dir,
-        model=settings.llm_model,
-        persona=str(settings.persona_path),
-    )
-
-    # ── Conversation State ──────────────────────────────────────────
-    history: list[Message] = []
-
-    if args.resume:
-        history = session_mgr.resume_session(args.resume)
-    elif args.continue_session:
-        try:
-            history = session_mgr.continue_last_session()
-        except FileNotFoundError:
-            session_mgr.start_new_session()
-    else:
-        session_mgr.start_new_session()
 
     # ── Clause Guards ───────────────────────────────────────────────
     patterns_path = Path("nemoclaw/guards/patterns.yaml")
@@ -157,31 +128,61 @@ async def run(args: argparse.Namespace) -> None:
         auto_allow_after_n=settings.permissions_auto_allow_after_n,
     )
 
-    # ── Compaction Manager ──────────────────────────────────────────
+    # ── Telegram Transport ─────────────────────────────────────────
+    if settings.transport == "telegram":
+        from nemoclaw.transport.telegram import TelegramTransport
+
+        transport = TelegramTransport(
+            settings=settings,
+            llm=llm,
+            tool_registry=tool_registry,
+            memory_store=memory_store,
+            clause_guards=clause_guards,
+            permission_pipeline=permission_pipeline,
+        )
+        await transport.run()
+        return
+
+    # ── CLI Transport ──────────────────────────────────────────────
+    session_mgr = SessionManager(
+        sessions_dir=settings.session_dir,
+        model=settings.llm_model,
+        persona=str(settings.persona_path),
+    )
+
+    history: list[Message] = []
+
+    if args.resume:
+        history = session_mgr.resume_session(args.resume)
+    elif args.continue_session:
+        try:
+            history = session_mgr.continue_last_session()
+        except FileNotFoundError:
+            session_mgr.start_new_session()
+    else:
+        session_mgr.start_new_session()
+
     compaction_mgr = CompactionManager(
         max_context_tokens=settings.max_context_tokens,
         memory_store=memory_store,
     )
 
-    # ── Build System Prompt ─────────────────────────────────────────
     memory_block = memory_store.get_memory_block()
     tool_descriptions = [
         f"{t.name}: {t.description}" for t in tool_registry.tools.values()
     ]
-    memory_block = memory_store.get_memory_block()
     system_prompt = build_system_prompt(
         persona_path=settings.persona_path,
         tool_descriptions=tool_descriptions if tool_descriptions else None,
         memory_block=memory_block,
     )
 
-    # ── Initialize Transport ────────────────────────────────────────
-    transport = CLITransport()
-    await transport.startup()
+    cli_transport = CLITransport()
+    await cli_transport.startup()
 
     try:
         while True:
-            user_input = await transport.get_input()
+            user_input = await cli_transport.get_input()
 
             if not user_input:
                 break
@@ -191,15 +192,13 @@ async def run(args: argparse.Namespace) -> None:
             if user_input == "/history":
                 continue
             if user_input == "/tools":
-                transport.show_tools(list(tool_registry.tools.keys()))
+                cli_transport.show_tools(list(tool_registry.tools.keys()))
                 continue
 
-            # Record user message for transport history
-            transport._conversation_history.append(
+            cli_transport._conversation_history.append(
                 {"role": "user", "content": user_input},
             )
 
-            # Pre-response hook
             await pre_response_hook(user_input)
 
             try:
@@ -211,27 +210,25 @@ async def run(args: argparse.Namespace) -> None:
                     history=history,
                     max_turns=settings.max_turns,
                     stream=True,
-                    on_chunk=transport.send_chunk,
-                    on_tool_call=transport.send_tool_status,
+                    on_chunk=cli_transport.send_chunk,
+                    on_tool_call=cli_transport.send_tool_status,
                     session_manager=session_mgr,
                     clause_guards=clause_guards,
                     permission_pipeline=permission_pipeline,
                     compaction_manager=compaction_mgr,
                 )
 
-                await transport.send_response(response.content)
-
-                # Post-response hook
+                await cli_transport.send_response(response.content)
                 await post_response_hook(user_input, response)
 
             except ConnectionError as e:
-                await transport.show_error(str(e))
+                await cli_transport.show_error(str(e))
             except Exception as e:
                 logging.exception("Agent loop error")
-                await transport.show_error(f"Unexpected error: {e}")
+                await cli_transport.show_error(f"Unexpected error: {e}")
 
     finally:
-        await transport.shutdown()
+        await cli_transport.shutdown()
         await llm.close()
 
 

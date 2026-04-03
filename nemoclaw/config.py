@@ -59,6 +59,12 @@ class Settings(BaseSettings):
     # Transport
     transport: str = "cli"
 
+    # ── Telegram ───────────────────────────────────────────────────
+    telegram_token: str = ""
+    telegram_allowed_users: list[str] = ["*"]
+    telegram_max_message_length: int = 4096
+    telegram_edit_interval: float = 1.0
+
     # ── Permissions ─────────────────────────────────────────────────
     permissions_always_allow: list[str] = [
         "read_file", "glob", "web_fetch", "memory_search",
