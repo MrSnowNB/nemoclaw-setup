@@ -134,6 +134,29 @@ permanent_fix: |
 prevention: |
   Before any NemoClaw install, verify df -h shows >= 50 GB free on Docker root partition.
   Add this check to the pre-flight section of REPLICATION-NOTES.md.
+
+### TROUBLE-005 — Forge Server Connection Refused (Telegram Unresponsive)
+
+```yaml
+id: TROUBLE-005
+date: 2026-04-04
+context: Alice not responding on Telegram, "LLM request failed: network connection error"
+symptom: curl to localhost:18080 returns Connection Refused
+error_snippet: |
+  * connect to 127.0.0.1 port 18080 from 127.0.0.1 port 57470 failed: Connection refused
+  * Failed to connect to 127.0.0.1 port 18080 after 0 ms: Couldn't connect to server
+probable_cause: |
+  The forge_server (uvicorn) process terminated silently or was never started.
+  OpenClaw (NemoClaw) attempts to reach the LLM via this proxy, and fails when the port is closed.
+quick_fix: |
+  1. export PYTHONPATH="/home/mr-snow/alice_cyberland"
+  2. nohup /home/mr-snow/alice_cyberland/venv_stable/bin/python3 -m uvicorn core.forge_server:app --port 18080 --host 127.0.0.1 > forge_server.log 2>&1 &
+permanent_fix: |
+  Ensure launch.sh is used and monitor forge_server.log for startup crashes. 
+  Add a systemd service for forge_server to ensure it restarts on failure.
+prevention: |
+  Implement a health check in launch.sh that verifies port 18080 is listening before exiting.
+```
 ```
 
 ---

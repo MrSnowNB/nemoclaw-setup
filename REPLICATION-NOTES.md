@@ -59,17 +59,12 @@ Complete every item in order before running any install step.
 
 5. **Do not set `--cpu-offload-gb` higher than available free RAM minus ~80 GB OS headroom.** On this machine, max safe value is ~350 GB combined across both vLLM instances.
 
----
+### 2026-04-04 — Forge Server Restoration
 
-## Environment Deltas Log
-
-### 2026-03-30 — Initial Setup
-
-- Node.js upgraded from v20.19.5 (npm 11) to v22.22.2 (npm 10.9.7) via nvm during NemoClaw install
-- NemoClaw CLI v0.1.0 installed at `/home/mr-snow/.nvm/versions/node/v22.22.2/bin/nemoclaw`
-- OpenShell CLI v0.0.16 installed
-- NemoClaw onboarding failed 3x due to ephemeral storage eviction on NVMe (TROUBLE-004)
-- Resolution: clearing NVMe storage, retrying after `docker system prune -a --volumes`
+- Resolved "network connection error" in Telegram transport by restarting `forge_server.py`.
+- Root cause: `forge_server` (uvicorn) was not running on port 18080.
+- Restoration: `export PYTHONPATH="/home/mr-snow/alice_cyberland" && nohup /home/mr-snow/alice_cyberland/venv_stable/bin/python3 -m uvicorn core.forge_server:app --port 18080 --host 127.0.0.1 > forge_server.log 2>&1 &`
+- Verified port 18080 is active and responding to `/v1/models`.
 
 ---
 

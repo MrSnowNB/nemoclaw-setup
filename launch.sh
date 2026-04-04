@@ -21,6 +21,15 @@ echo "Forge (Uvicorn) PID: $UVICORN_PID"
 # Wait a few seconds for initialization
 sleep 5
 
+# Health Check
+echo "🔍 Verifying forge_server health..."
+if curl -s http://127.0.0.1:18080/health > /dev/null; then
+    echo "✅ forge_server is healthy and listening on port 18080."
+else
+    echo "❌ forge_server failed to start or is not responding."
+    exit 1
+fi
+
 lsof -i :18080
 
 echo "------------------------------------------"
