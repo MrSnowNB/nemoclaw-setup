@@ -23,6 +23,14 @@ class ToolRegistry:
         """Return all tools as OpenAI function calling schemas."""
         return [t.to_openai_schema() for t in self.tools.values()]
 
+    def subset(self, names: list[str]) -> ToolRegistry:
+        """Return a new ToolRegistry containing only the named tools."""
+        new_registry = ToolRegistry()
+        for name in names:
+            if tool := self.get(name):
+                new_registry.register(tool)
+        return new_registry
+
     def register_defaults(self) -> None:
         """Register all built-in tools (not including memory tools, which need a store)."""
         from nemoclaw.tools.bash import BashTool

@@ -11,6 +11,7 @@ from nemoclaw.agent.compaction import CompactionManager
 from nemoclaw.agent.hooks import post_response_hook, pre_response_hook
 from nemoclaw.agent.loop import run_agent_loop
 from nemoclaw.agent.prompt import build_system_prompt
+from nemoclaw.agent.router import ROUTE_TOOLS, classify_intent
 from nemoclaw.config import Settings
 from nemoclaw.guards.clause_guards import ClauseGuards
 from nemoclaw.llm.registry import create_llm_provider
