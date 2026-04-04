@@ -6,11 +6,17 @@
 base_dir: "~/.nemoclaw"
 
 # LLM provider settings (OpenAI-compatible endpoint)
-llm_base_url: "http://localhost:11434/v1"
-llm_model: "qwen3.5:35b"
-llm_api_key: "ollama"
+# Primary: llama.cpp (supports native qwen35moe + vision)
+llm_base_url: "http://localhost:8080/v1"
+llm_model: "qwen3.5"
+llm_api_key: "empty"
 llm_temperature: 0.7
 llm_max_tokens: 4096
+
+# Fallback: Ollama
+# llm_base_url: "http://localhost:11434/v1"
+# llm_model: "qwen3.5:35b"
+# llm_api_key: "ollama"
 
 # Persona file (relative to project root)
 persona_path: "alice/ALICE.md"
