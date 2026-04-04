@@ -297,7 +297,7 @@ class TelegramTransport(Transport):
                 compaction_manager=self._compaction_manager,
             )
 
-            await post_response_hook(user_text, response)
+            await post_response_hook(user_text, response, memory_dir=self.settings.memory_dir)
 
             final_text = response.content or "(No response)"
             # Split long responses

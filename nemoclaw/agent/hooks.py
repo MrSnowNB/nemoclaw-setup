@@ -84,8 +84,8 @@ async def post_response_hook(
     Extracts facts from user input and writes them to .nemoclaw/memory/MEMORY.md.
     Falls back to the default memory dir if none is provided.
     """
-    logger.debug(
-        "post_response_hook: turns=%d, tool_calls=%d",
+    logger.info(
+        "post_response_hook triggered: turns=%d, tool_calls=%d",
         response.turns_used,
         len(response.tool_calls_made),
     )
@@ -96,9 +96,14 @@ async def post_response_hook(
     else:
         mem_path = Path(memory_dir)
 
+    logger.info("post_response_hook: using memory path %s", mem_path)
+
     facts = _extract_facts(user_input)
     if facts:
+        logger.info("post_response_hook: extracted %d facts", len(facts))
         try:
             _append_to_memory(facts, mem_path)
         except Exception as exc:  # noqa: BLE001
             logger.warning("post_response_hook: failed to write memory: %s", exc)
+    else:
+        logger.info("post_response_hook: no facts extracted from input")

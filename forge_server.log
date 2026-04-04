@@ -52,3 +52,6 @@ INFO:     127.0.0.1:43040 - "POST /v1/chat/completions HTTP/1.1" 200 OK
 INFO:     127.0.0.1:36758 - "POST /v1/chat/completions HTTP/1.1" 200 OK
 INFO:     127.0.0.1:45280 - "POST /v1/chat/completions HTTP/1.1" 200 OK
 INFO:     127.0.0.1:57906 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33112 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56332 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57006 - "POST /v1/chat/completions HTTP/1.1" 200 OK
