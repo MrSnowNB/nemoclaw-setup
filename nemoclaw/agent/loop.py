@@ -310,12 +310,19 @@ async def run_agent_loop(
         if session_manager:
             session_manager.log_message("assistant", final_content)
 
-        return AgentResponse(
+        # ── Background Hooks ────────────────────────────────────
+        from nemoclaw.agent import hooks
+        agent_response = AgentResponse(
             content=final_content,
             tool_calls_made=all_tool_calls,
             token_usage=total_usage,
             turns_used=turns,
         )
+        asyncio.create_task(
+            hooks.post_response_hook(user_input, agent_response)
+        )
+
+        return agent_response
 
     # Max turns reached — return whatever we have
     max_turns_msg = "[Reached maximum tool-use turns. Stopping.]"

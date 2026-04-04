@@ -50,9 +50,10 @@ _RULES: list[tuple[re.Pattern, Route]] = [
         re.IGNORECASE,
     ), Route.MEMORY_OP),
 
-    # Web / fetch
+    # Web / fetch (including weather and locations)
     (re.compile(
-        r"\b(fetch|search|look up|browse|go to|open url|http|www\.)",
+        r"\b(fetch|search|look up|browse|go to|open url|http|www\.|weather|forecast|temperature|outside"
+        r"|[a-z ]+,\s*[a-z]{2}\b)",
         re.IGNORECASE,
     ), Route.WEB),
 

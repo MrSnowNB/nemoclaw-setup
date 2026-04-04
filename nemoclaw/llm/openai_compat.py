@@ -110,6 +110,24 @@ class OpenAICompatClient(LLMProvider):
                 resp = await self._client.post("/chat/completions", json=payload)
                 resp.raise_for_status()
                 data = resp.json()
+
+                # --- DEBUG LOGGING START ---
+                import json, datetime
+                try:
+                    with open("/tmp/nemoclaw_llm_debug.jsonl", "a") as f:
+                        choice = data.get("choices", [{}])[0]
+                        msg = choice.get("message", {})
+                        entry = {
+                            "timestamp": datetime.datetime.now().isoformat(),
+                            "content": msg.get("content"),
+                            "tool_calls": msg.get("tool_calls"),
+                            "finish_reason": choice.get("finish_reason")
+                        }
+                        f.write(json.dumps(entry) + "\n")
+                except Exception as log_err:
+                    logger.warning("Debug logging failed: %s", log_err)
+                # --- DEBUG LOGGING END ---
+
                 usage = data.get("usage", {})
                 self._last_usage = TokenUsage(
                     prompt_tokens=usage.get("prompt_tokens", 0),
@@ -157,6 +175,20 @@ class OpenAICompatClient(LLMProvider):
                         if line.startswith("data: "):
                             try:
                                 chunk = json.loads(line[6:])
+                                
+                                # --- DEBUG LOGGING START ---
+                                import json, datetime
+                                try:
+                                    with open("/tmp/nemoclaw_llm_debug.jsonl", "a") as f:
+                                        entry = {
+                                            "timestamp": datetime.datetime.now().isoformat(),
+                                            "stream_chunk": chunk
+                                        }
+                                        f.write(json.dumps(entry) + "\n")
+                                except Exception:
+                                    pass
+                                # --- DEBUG LOGGING END ---
+
                                 yield chunk
                             except json.JSONDecodeError:
                                 continue

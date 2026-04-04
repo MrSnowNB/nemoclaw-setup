@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import re
 import signal
@@ -60,6 +61,35 @@ def _split_message(text: str, max_length: int = 4096) -> list[str]:
         chunks.append(text[:split_at])
         text = text[split_at:].lstrip("\n")
     return chunks
+
+
+def _strip_thinking(content: str) -> str:
+    """Remove <think>...</think> blocks from model output."""
+    if not content:
+        return content
+    # Remove complete think blocks
+    cleaned = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL)
+    # Remove unclosed think blocks
+    cleaned = re.sub(r"<think>.*$", "", cleaned, flags=re.DOTALL)
+    return cleaned.strip()
+
+
+def _clean_content_for_display(content: str) -> str:
+    """Remove JSON code blocks that contain tool_calls and other noise."""
+    if not content:
+        return ""
+    # Remove ```json blocks containing tool_calls
+    cleaned = re.sub(
+        r'```json\s*\{[^`]*"tool_calls"[^`]*\}\s*```',
+        "",
+        content,
+        flags=re.DOTALL,
+    )
+    # Remove any remaining orphaned ``` markers
+    cleaned = re.sub(r"```\s*```", "", cleaned)
+    # Strip separator lines often emitted by messy models
+    cleaned = re.sub(r"^\s*---\s*$", "", cleaned, flags=re.MULTILINE)
+    return cleaned.strip()
 
 
 class TelegramTransport(Transport):
@@ -299,7 +329,14 @@ class TelegramTransport(Transport):
 
             await post_response_hook(user_text, response, memory_dir=self.settings.memory_dir)
 
-            final_text = response.content or "(No response)"
+            final_text = response.content or ""
+            # Clean up thinking blocks and hallucinated tool calls
+            final_text = _strip_thinking(final_text)
+            final_text = _clean_content_for_display(final_text)
+
+            if not final_text:
+                final_text = "(No response)"
+
             # Split long responses
             chunks = _split_message(final_text, self._max_len)
 
@@ -331,6 +368,72 @@ class TelegramTransport(Transport):
                 await placeholder.edit_text(f"Error: {e}")
             except Exception:
                 await update.effective_chat.send_message(f"Error: {e}")
+
+    # ── Transport ABC (used for standalone mode) ───────────────────
+
+    async def get_input(self) -> str:
+        # Not used in Telegram mode — polling drives input
+        return ""
+
+    async def send_chunk(self, chunk: str) -> None:
+        pass  # Handled via on_chunk callback in _handle_message
+
+    async def send_tool_status(
+        self, tool_name: str, status: str, result: str | None = None,
+    ) -> None:
+        pass  # Handled via on_tool_call callback in _handle_message
+
+    async def send_response(self, response: str) -> None:
+        pass  # Handled in _handle_message
+
+    async def show_error(self, error: str) -> None:
+        pass  # Handled in _handle_message
+
+    # ── Run ────────────────────────────────────────────────────────
+
+    async def run(self) -> None:
+        """Start the Telegram bot with polling."""
+        token = self.settings.telegram_token
+        if not token:
+            raise ValueError(
+                "Telegram token not set. Set NEMOCLAW_TELEGRAM_TOKEN env var."
+            )
+
+        app = Application.builder().token(token).build()
+
+        # Register handlers
+        app.add_handler(CommandHandler("start", self._cmd_start))
+        app.add_handler(CommandHandler("clear", self._cmd_clear))
+        app.add_handler(CommandHandler("tools", self._cmd_tools))
+        app.add_handler(CommandHandler("history", self._cmd_history))
+        app.add_handler(CommandHandler("status", self._cmd_status))
+        app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self._handle_message))
+
+        logger.info("Starting Telegram bot polling...")
+        await app.initialize()
+        await app.start()
+        await app.updater.start_polling()  # type: ignore[union-attr]
+
+        # Wait for shutdown signal
+        stop_event = asyncio.Event()
+
+        def _signal_handler() -> None:
+            stop_event.set()
+
+        loop = asyncio.get_running_loop()
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            try:
+                loop.add_signal_handler(sig, _signal_handler)
+            except NotImplementedError:
+                pass  # Windows doesn't support add_signal_handler
+
+        await stop_event.wait()
+
+        logger.info("Shutting down Telegram bot...")
+        await app.updater.stop()  # type: ignore[union-attr]
+        await app.stop()
+        await app.shutdown()
+        await self.llm.close()
 
     # ── Transport ABC (used for standalone mode) ───────────────────
 
