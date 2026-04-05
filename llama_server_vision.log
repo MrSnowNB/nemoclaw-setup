@@ -15,15 +15,15 @@ srv    load_model: loading model '/home/mr-snow/models/qwen35/Qwen3.5-35B-A3B-Q8
 common_init_result: fitting params to device memory, for bugs during this step try to reproduce them with -fit off, or provide --verbose logs if the bug only occurs with -fit on
 llama_params_fit_impl: projected memory use with initial parameters [MiB]:
 llama_params_fit_impl:   - CUDA0 (NVIDIA RTX A6000):  48531 total,      0 used,  48246 free vs. target of   1024
-llama_params_fit_impl:   - CUDA1 (NVIDIA RTX A6000):  45485 total,      0 used,  43400 free vs. target of   1024
+llama_params_fit_impl:   - CUDA1 (NVIDIA RTX A6000):  45485 total,      0 used,  43311 free vs. target of   1024
 llama_params_fit_impl:   - CUDA2 (NVIDIA RTX A6000):  45485 total,  18757 used,  26308 free vs. target of   1024
 llama_params_fit_impl:   - CUDA3 (NVIDIA RTX A6000):  48539 total,  17826 used,  30077 free vs. target of   1024
-llama_params_fit_impl: projected to use 36584 MiB of device memory vs. 184616 MiB of free device memory
+llama_params_fit_impl: projected to use 36584 MiB of device memory vs. 184527 MiB of free device memory
 llama_params_fit_impl: targets for free memory can be met on all devices, no changes needed
 llama_params_fit: successfully fit params to free device memory
-llama_params_fit: fitting params to free memory took 1.46 seconds
+llama_params_fit: fitting params to free memory took 1.14 seconds
 llama_model_load_from_file_impl: using device CUDA0 (NVIDIA RTX A6000) (0000:47:00.0) - 48246 MiB free
-llama_model_load_from_file_impl: using device CUDA1 (NVIDIA RTX A6000) (0000:5e:00.0) - 43395 MiB free
+llama_model_load_from_file_impl: using device CUDA1 (NVIDIA RTX A6000) (0000:5e:00.0) - 43309 MiB free
 llama_model_load_from_file_impl: using device CUDA2 (NVIDIA RTX A6000) (0000:75:00.0) - 45200 MiB free
 llama_model_load_from_file_impl: using device CUDA3 (NVIDIA RTX A6000) (0000:a3:00.0) - 48021 MiB free
 llama_model_loader: loaded meta data with 52 key-value pairs and 733 tensors from /home/mr-snow/models/qwen35/Qwen3.5-35B-A3B-Q8_0.gguf (version GGUF V3 (latest))
@@ -168,7 +168,9 @@ load_tensors: offloaded 41/41 layers to GPU
 load_tensors:   CPU_Mapped model buffer size =   515.31 MiB
 load_tensors:        CUDA2 model buffer size = 17931.70 MiB
 load_tensors:        CUDA3 model buffer size = 16736.08 MiB
-....................................................................................................
+...............................srv  log_server_r: done request: POST /v1/chat/completions 127.0.0.1 503
+........................srv  log_server_r: done request: POST /v1/chat/completions 127.0.0.1 503
+.............................................
 common_init_result: added <|endoftext|> logit bias = -inf
 common_init_result: added <|im_end|> logit bias = -inf
 common_init_result: added <|fim_pad|> logit bias = -inf
@@ -201,13 +203,53 @@ sched_reserve: Flash Attention was auto, set to enabled
 sched_reserve: resolving fused Gated Delta Net support:
 sched_reserve: fused Gated Delta Net (autoregressive) enabled
 sched_reserve: fused Gated Delta Net (chunked) enabled
+srv  log_server_r: done request: POST /v1/chat/completions 127.0.0.1 503
 sched_reserve:      CUDA2 compute buffer size =   372.06 MiB
 sched_reserve:      CUDA3 compute buffer size =   637.07 MiB
 sched_reserve:  CUDA_Host compute buffer size =   264.08 MiB
 sched_reserve: graph nodes  = 3729
 sched_reserve: graph splits = 3
-sched_reserve: reserve took 93.59 ms, sched copies = 4
+sched_reserve: reserve took 100.61 ms, sched copies = 4
 common_init_from_params: warming up the model with an empty run - please wait ... (--no-warmup to disable)
+clip_model_loader: model name:   Qwen3.5-35B-A3B
+clip_model_loader: description:  
+clip_model_loader: GGUF version: 3
+clip_model_loader: alignment:    32
+clip_model_loader: n_tensors:    334
+clip_model_loader: n_kv:         35
+
+clip_model_loader: has vision encoder
+clip_ctx: CLIP using CUDA0 backend
+load_hparams: Qwen-VL models require at minimum 1024 image tokens to function correctly on grounding tasks
+load_hparams: if you encounter problems with accuracy, try adding --image-min-tokens 1024
+load_hparams: more info: https://github.com/ggml-org/llama.cpp/issues/16842
+
+load_hparams: projector:          qwen3vl_merger
+load_hparams: n_embd:             1152
+load_hparams: n_head:             16
+load_hparams: n_ff:               4304
+load_hparams: n_layer:            27
+load_hparams: ffn_op:             gelu
+load_hparams: projection_dim:     2048
+
+--- vision hparams ---
+load_hparams: image_size:         768
+load_hparams: patch_size:         16
+load_hparams: has_llava_proj:     0
+load_hparams: minicpmv_version:   0
+load_hparams: n_merge:            2
+load_hparams: n_wa_pattern: 0
+load_hparams: image_min_pixels:   8192
+load_hparams: image_max_pixels:   4194304
+
+load_hparams: model size:         860.98 MiB
+load_hparams: metadata size:      0.12 MiB
+warmup: warmup with image size = 1472 x 1472
+alloc_compute_meta:      CUDA0 compute buffer size =   248.10 MiB
+alloc_compute_meta:        CPU compute buffer size =    24.93 MiB
+alloc_compute_meta: graph splits = 1, nodes = 823
+warmup: flash attention is enabled
+srv    load_model: loaded multimodal model, '/home/mr-snow/models/qwen35/mmproj-BF16.gguf'
 srv    load_model: initializing slots, n_slots = 4
 common_speculative_is_compat: the target context does not support partial sequence removal
 srv    load_model: speculative decoding not supported by this context
@@ -232,88 +274,6 @@ How are you?<|im_end|>
 '
 srv          init: init: chat template, thinking = 1
 main: model loaded
-main: server is listening on http://0.0.0.0:8081
+main: server is listening on http://0.0.0.0:8080
 main: starting the main loop...
-srv  update_slots: all slots are idle
-srv  params_from_: Chat format: peg-native
-slot get_availabl: id  3 | task -1 | selected slot by LRU, t_last = -1
-srv  get_availabl: updating prompt cache
-srv          load:  - looking for better prompt, base f_keep = -1.000, sim = 0.000
-srv        update:  - cache state: 0 prompts, 0.000 MiB (limits: 8192.000 MiB, 32768 tokens, 8589934592 est)
-srv  get_availabl: prompt cache update took 0.02 ms
-slot launch_slot_: id  3 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> top-p -> min-p -> ?xtc -> temp-ext -> dist 
-slot launch_slot_: id  3 | task 0 | processing task, is_child = 0
-slot update_slots: id  3 | task 0 | new prompt, n_ctx_slot = 32768, n_keep = 0, task.n_tokens = 1198
-slot update_slots: id  3 | task 0 | n_tokens = 0, memory_seq_rm [0, end)
-slot update_slots: id  3 | task 0 | prompt processing progress, n_tokens = 682, batch.n_tokens = 682, progress = 0.569282
-slot update_slots: id  3 | task 0 | n_tokens = 682, memory_seq_rm [682, end)
-slot update_slots: id  3 | task 0 | prompt processing progress, n_tokens = 1194, batch.n_tokens = 512, progress = 0.996661
-slot update_slots: id  3 | task 0 | created context checkpoint 1 of 32 (pos_min = 681, pos_max = 681, n_tokens = 682, size = 62.813 MiB)
-slot update_slots: id  3 | task 0 | n_tokens = 1194, memory_seq_rm [1194, end)
-reasoning-budget: activated, budget=2147483647 tokens
-slot init_sampler: id  3 | task 0 | init sampler, took 0.16 ms, tokens: text = 1198, total = 1198
-slot update_slots: id  3 | task 0 | prompt processing done, n_tokens = 1198, batch.n_tokens = 4
-slot update_slots: id  3 | task 0 | created context checkpoint 2 of 32 (pos_min = 1193, pos_max = 1193, n_tokens = 1194, size = 62.813 MiB)
-reasoning-budget: deactivated (natural end)
-slot print_timing: id  3 | task 0 | 
-prompt eval time =     616.01 ms /  1198 tokens (    0.51 ms per token,  1944.76 tokens per second)
-       eval time =    1668.73 ms /   168 tokens (    9.93 ms per token,   100.68 tokens per second)
-      total time =    2284.75 ms /  1366 tokens
-slot      release: id  3 | task 0 | stop processing: n_tokens = 1365, truncated = 0
-srv  update_slots: all slots are idle
-srv  log_server_r: done request: POST /v1/chat/completions 127.0.0.1 200
-srv  params_from_: Chat format: peg-native
-slot get_availabl: id  3 | task -1 | selected slot by LCP similarity, sim_best = 1.000 (> 0.100 thold), f_keep = 0.878
-slot launch_slot_: id  3 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> top-p -> min-p -> ?xtc -> temp-ext -> dist 
-slot launch_slot_: id  3 | task 171 | processing task, is_child = 0
-slot update_slots: id  3 | task 171 | new prompt, n_ctx_slot = 32768, n_keep = 0, task.n_tokens = 1198
-slot update_slots: id  3 | task 171 | n_past = 1198, slot.prompt.tokens.size() = 1365, seq_id = 3, pos_min = 1364, n_swa = 0
-slot update_slots: id  3 | task 171 | Checking checkpoint with [1193, 1193] against 1198...
-slot update_slots: id  3 | task 171 | restored context checkpoint (pos_min = 1193, pos_max = 1193, n_tokens = 1194, n_past = 1194, size = 62.813 MiB)
-slot update_slots: id  3 | task 171 | n_tokens = 1194, memory_seq_rm [1194, end)
-reasoning-budget: activated, budget=2147483647 tokens
-slot init_sampler: id  3 | task 171 | init sampler, took 0.16 ms, tokens: text = 1198, total = 1198
-slot update_slots: id  3 | task 171 | prompt processing done, n_tokens = 1198, batch.n_tokens = 4
-srv  log_server_r: done request: POST /v1/chat/completions 127.0.0.1 200
-srv          stop: cancel task, id_task = 171
-slot      release: id  3 | task 171 | stop processing: n_tokens = 1200, truncated = 0
-srv  update_slots: all slots are idle
-srv  params_from_: Chat format: peg-native
-slot get_availabl: id  3 | task -1 | selected slot by LCP similarity, sim_best = 0.928 (> 0.100 thold), f_keep = 0.997
-slot launch_slot_: id  3 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> top-p -> min-p -> ?xtc -> temp-ext -> dist 
-slot launch_slot_: id  3 | task 176 | processing task, is_child = 0
-slot update_slots: id  3 | task 176 | new prompt, n_ctx_slot = 32768, n_keep = 0, task.n_tokens = 1289
-slot update_slots: id  3 | task 176 | n_past = 1196, slot.prompt.tokens.size() = 1200, seq_id = 3, pos_min = 1199, n_swa = 0
-slot update_slots: id  3 | task 176 | Checking checkpoint with [1193, 1193] against 1196...
-slot update_slots: id  3 | task 176 | restored context checkpoint (pos_min = 1193, pos_max = 1193, n_tokens = 1194, n_past = 1194, size = 62.813 MiB)
-slot update_slots: id  3 | task 176 | n_tokens = 1194, memory_seq_rm [1194, end)
-slot update_slots: id  3 | task 176 | prompt processing progress, n_tokens = 1285, batch.n_tokens = 91, progress = 0.996897
-slot update_slots: id  3 | task 176 | n_tokens = 1285, memory_seq_rm [1285, end)
-reasoning-budget: activated, budget=2147483647 tokens
-slot init_sampler: id  3 | task 176 | init sampler, took 0.17 ms, tokens: text = 1289, total = 1289
-slot update_slots: id  3 | task 176 | prompt processing done, n_tokens = 1289, batch.n_tokens = 4
-slot update_slots: id  3 | task 176 | created context checkpoint 3 of 32 (pos_min = 1284, pos_max = 1284, n_tokens = 1285, size = 62.813 MiB)
-reasoning-budget: deactivated (natural end)
-slot print_timing: id  3 | task 176 | 
-prompt eval time =     140.47 ms /    95 tokens (    1.48 ms per token,   676.28 tokens per second)
-       eval time =    3333.24 ms /   332 tokens (   10.04 ms per token,    99.60 tokens per second)
-      total time =    3473.72 ms /   427 tokens
-slot      release: id  3 | task 176 | stop processing: n_tokens = 1620, truncated = 0
-srv  update_slots: all slots are idle
-srv  log_server_r: done request: POST /v1/chat/completions 127.0.0.1 200
-srv  params_from_: Chat format: peg-native
-slot get_availabl: id  3 | task -1 | selected slot by LCP similarity, sim_best = 1.000 (> 0.100 thold), f_keep = 0.796
-slot launch_slot_: id  3 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> top-p -> min-p -> ?xtc -> temp-ext -> dist 
-slot launch_slot_: id  3 | task 510 | processing task, is_child = 0
-slot update_slots: id  3 | task 510 | new prompt, n_ctx_slot = 32768, n_keep = 0, task.n_tokens = 1289
-slot update_slots: id  3 | task 510 | n_past = 1289, slot.prompt.tokens.size() = 1620, seq_id = 3, pos_min = 1619, n_swa = 0
-slot update_slots: id  3 | task 510 | Checking checkpoint with [1284, 1284] against 1289...
-slot update_slots: id  3 | task 510 | restored context checkpoint (pos_min = 1284, pos_max = 1284, n_tokens = 1285, n_past = 1285, size = 62.813 MiB)
-slot update_slots: id  3 | task 510 | n_tokens = 1285, memory_seq_rm [1285, end)
-reasoning-budget: activated, budget=2147483647 tokens
-slot init_sampler: id  3 | task 510 | init sampler, took 0.17 ms, tokens: text = 1289, total = 1289
-slot update_slots: id  3 | task 510 | prompt processing done, n_tokens = 1289, batch.n_tokens = 4
-srv  log_server_r: done request: POST /v1/chat/completions 127.0.0.1 200
-srv          stop: cancel task, id_task = 510
-slot      release: id  3 | task 510 | stop processing: n_tokens = 1291, truncated = 0
 srv  update_slots: all slots are idle
