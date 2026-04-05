@@ -62,3 +62,11 @@ Traceback (most recent call last):
     raise ConnectionError(f"LLM request failed after {_MAX_RETRIES} attempts: {last_err}")
 ConnectionError: LLM request failed after 3 attempts: Server error '503 Service Unavailable' for url 'http://localhost:8080/v1/chat/completions'
 For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/503
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/home/mr-snow/alice_cyberland/nemoclaw/__main__.py", line 24, in <module>
+    from nemoclaw.transport.cli import CLITransport
+  File "/home/mr-snow/alice_cyberland/nemoclaw/transport/cli.py", line 8, in <module>
+    from prompt_toolkit import PromptSession
+ModuleNotFoundError: No module named 'prompt_toolkit'
