@@ -1,37 +1,39 @@
 #!/bin/bash
+# Alice Cyberland - Master Orchestrator
 
-# ==========================================
-# Alice Cyberland - CLI-ONLY AUTONOMOUS STACK
-# ==========================================
+echo "🛑 Total system clear..."
+pkill -9 -f nemoclaw
+pkill -9 -f uvicorn
+pkill -9 -f telegram_cli.py
+# Stop any user-level services if they exist
+systemctl --user stop openclaw-gateway.service 2>/dev/null
 
-# Kill existing
-echo "🛑 Cleaning up existing processes..."
-pkill -f "uvicorn core.forge_server:app"
-# We don't kill gateway here because it's systemd managed
+# Clean logs
+echo "🧹 Cleaning logs..."
+> forge_server.log
+> nemoclaw_bot.log
 
-# 1. Start the forge_server (uvicorn)
-echo "🚀 Starting forge_server (uvicorn) on port 18080..."
 export PYTHONPATH="/home/mr-snow/alice_cyberland"
-/home/mr-snow/alice_cyberland/venv_stable/bin/python3 -m uvicorn core.forge_server:app --port 18080 --host 127.0.0.1 > forge_server.log 2>&1 &
-UVICORN_PID=$!
+VENV="/home/mr-snow/alice_cyberland/venv_stable/bin/python3"
 
-echo "✅ Alice stack is initializing..."
-echo "Forge (Uvicorn) PID: $UVICORN_PID"
+# 1. Start Forge Server (Proxy)
+echo "🚀 Starting forge_server..."
+$VENV -m uvicorn core.forge_server:app --port 18080 --host 127.0.0.1 > forge_server.log 2>&1 &
+FORGE_PID=$!
+sleep 3
 
-# Wait a few seconds for initialization
+# 2. Start NemoClaw Bot with Persona & Agency
+# We use alice/ALICE.md as the verified persona path.
+echo "🤖 Starting Alice (nemoclaw)..."
+$VENV -m nemoclaw \
+  --transport telegram \
+  --persona /home/mr-snow/alice_cyberland/alice/ALICE.md \
+  --config /home/mr-snow/.openclaw/openclaw.json \
+  > nemoclaw_bot.log 2>&1 &
+BOT_PID=$!
+
+echo "✅ Stack initialized."
+echo "Forge PID: $FORGE_PID | Bot PID: $BOT_PID"
+echo "Monitoring logs for conflicts..."
 sleep 5
-
-# Health Check
-echo "🔍 Verifying forge_server health..."
-if curl -s http://127.0.0.1:18080/health > /dev/null; then
-    echo "✅ forge_server is healthy and listening on port 18080."
-else
-    echo "❌ forge_server failed to start or is not responding."
-    exit 1
-fi
-
-lsof -i :18080
-
-echo "------------------------------------------"
-echo "Alice is now active."
-echo "------------------------------------------"
+tail -n 10 nemoclaw_bot.log
