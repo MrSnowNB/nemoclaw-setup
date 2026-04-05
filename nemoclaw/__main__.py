@@ -14,7 +14,7 @@ from nemoclaw.agent.prompt import build_system_prompt
 from nemoclaw.agent.router import ROUTE_TOOLS, classify_intent
 from nemoclaw.config import Settings
 from nemoclaw.guards.clause_guards import ClauseGuards
-from nemoclaw.llm.registry import create_llm_provider
+from nemoclaw.llm.registry import create_llm_provider, create_vision_provider
 from nemoclaw.memory.store import MemoryStore
 from nemoclaw.memory.tools import MemorySearchTool, MemoryWriteTool
 from nemoclaw.models import Message
@@ -40,6 +40,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--base-url", default=None,
         help="LLM API base URL (default: from config)",
+    )
+    parser.add_argument(
+        "--vision-base-url", default=None,
+        help="Vision LLM API base URL (default: from config)",
     )
     parser.add_argument(
         "--config", default=None,
@@ -82,6 +86,8 @@ async def run(args: argparse.Namespace) -> None:
         overrides["llm_model"] = args.model
     if args.base_url:
         overrides["llm_base_url"] = args.base_url
+    if args.vision_base_url:
+        overrides["llm_vision_base_url"] = args.vision_base_url
     if args.persona:
         overrides["persona_path"] = args.persona
     if args.max_turns:
@@ -99,6 +105,7 @@ async def run(args: argparse.Namespace) -> None:
 
     # Initialize components
     llm = create_llm_provider(settings)
+    vision_llm = create_vision_provider(settings)
 
     # ── Memory Store ────────────────────────────────────────────────
     memory_store = MemoryStore(
@@ -214,6 +221,7 @@ async def run(args: argparse.Namespace) -> None:
                     clause_guards=clause_guards,
                     permission_pipeline=permission_pipeline,
                     compaction_manager=compaction_mgr,
+                    vision_llm=vision_llm,
                 )
 
                 await cli_transport.send_response(response.content)
@@ -228,6 +236,7 @@ async def run(args: argparse.Namespace) -> None:
     finally:
         await cli_transport.shutdown()
         await llm.close()
+        await vision_llm.close()
 
 
 def main() -> None:

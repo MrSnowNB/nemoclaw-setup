@@ -41,6 +41,7 @@ class Settings(BaseSettings):
 
     # LLM settings
     llm_base_url: str = "http://localhost:11434/v1"
+    llm_vision_base_url: str = "http://localhost:11435/v1"
     llm_model: str = "qwen3.5:35b"
     llm_api_key: str = "ollama"
     llm_temperature: float = 0.7

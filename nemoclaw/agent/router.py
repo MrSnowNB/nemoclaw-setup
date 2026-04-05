@@ -10,6 +10,7 @@ conversation  Plain chat, no tools needed.
 task          Code execution / file work — bash, read_file, write_file.
 memory_op     Explicit memory read/write request.
 web           Fetch / search request — web_fetch.
+vision        Image analysis / OCR.
 
 Usage
 -----
@@ -24,6 +25,7 @@ from __future__ import annotations
 
 import re
 from enum import Enum
+from typing import Any
 
 
 class Route(str, Enum):
@@ -31,6 +33,7 @@ class Route(str, Enum):
     TASK = "task"
     MEMORY_OP = "memory_op"
     WEB = "web"
+    VISION = "vision"
 
 
 # Tool names each route is allowed to see.
@@ -40,6 +43,7 @@ ROUTE_TOOLS: dict[Route, list[str]] = {
     Route.TASK: ["bash", "read_file", "write_file"],     # execution + file I/O
     Route.MEMORY_OP: ["memory_write", "memory_search"],  # memory only
     Route.WEB: ["web_fetch", "memory_search"],           # fetch + context lookup
+    Route.VISION: [],                                    # vision usually text-only
 }
 
 # Regex classifiers — first match wins, order matters.
@@ -65,19 +69,44 @@ _RULES: list[tuple[re.Pattern, Route]] = [
 ]
 
 
-def classify_intent(message: str) -> Route:
-    """Classify a user message into one of the four Route values.
+def classify_intent(message: str | list[dict[str, Any]] | None) -> Route:
+    """Classify a user message into one of the five Route values.
 
     Uses lightweight regex matching — no LLM call required.
     Falls back to CONVERSATION if no pattern matches.
 
     Args:
-        message: The raw user message string.
+        message: The raw user message (str or multipart list).
 
     Returns:
         A Route enum value.
     """
+    if message is None:
+        return Route.CONVERSATION
+
+    # If it's a list containing an image, it's definitely vision
+    if isinstance(message, list):
+        for part in message:
+            if isinstance(part, dict) and part.get("type") == "image_url":
+                return Route.VISION
+
+    # If it's a list, extract text for regex matching
+    text = ""
+    if isinstance(message, list):
+        text = " ".join(
+            p.get("text", "")
+            for p in message
+            if isinstance(p, dict) and p.get("type") == "text"
+        )
+    else:
+        text = message
+
+    # Keyword check for vision/image requests in text
+    if re.search(r"\b(image|picture|photo|see|look at|describe|what is this)\b", text, re.I):
+        return Route.VISION
+
     for pattern, route in _RULES:
-        if pattern.search(message):
+        if pattern.search(text):
             return route
+
     return Route.CONVERSATION

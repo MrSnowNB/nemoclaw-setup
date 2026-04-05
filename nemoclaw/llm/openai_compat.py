@@ -58,7 +58,17 @@ class OpenAICompatClient(LLMProvider):
         for m in messages:
             d: dict[str, Any] = {"role": m.role}
             if m.content is not None:
-                d["content"] = m.content
+                if isinstance(m.content, list):
+                    # Extract only text parts for non-vision models
+                    text_parts = [
+                        p.get("text", "")
+                        for p in m.content
+                        if isinstance(p, dict) and p.get("type") == "text"
+                    ]
+                    d["content"] = " ".join(text_parts) or None
+                else:
+                    d["content"] = m.content
+
             if m.tool_calls:
                 d["tool_calls"] = [
                     {
@@ -211,3 +221,57 @@ class OpenAICompatClient(LLMProvider):
     def get_last_usage(self) -> TokenUsage:
         """Return token usage from the last non-streaming call."""
         return self._last_usage
+
+
+class VisionClient(OpenAICompatClient):
+    """Client for vision-capable endpoints. Allows image data in messages."""
+
+    def _build_payload(
+        self,
+        messages: list[Message],
+        tools: list[dict] | None = None,
+        stream: bool = False,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+    ) -> dict[str, Any]:
+        """Build the request payload WITHOUT stripping images."""
+        msg_dicts = []
+        for m in messages:
+            d: dict[str, Any] = {"role": m.role}
+            if m.content is not None:
+                # For vision, we keep the content as-is (could be list or str)
+                d["content"] = m.content
+
+            # Vision models in this setup usually don't do tool calls,
+            # but we keep the structure for compatibility.
+            if m.tool_calls:
+                d["tool_calls"] = [
+                    {
+                        "id": tc.id,
+                        "type": "function",
+                        "function": {
+                            "name": tc.name,
+                            "arguments": json.dumps(tc.arguments),
+                        },
+                    }
+                    for tc in m.tool_calls
+                ]
+            if m.tool_call_id:
+                d["tool_call_id"] = m.tool_call_id
+            msg_dicts.append(d)
+
+        payload: dict[str, Any] = {
+            "model": self.model,
+            "messages": msg_dicts,
+            "stream": stream,
+        }
+
+        if temperature is not None:
+            payload["temperature"] = temperature
+        if max_tokens is not None:
+            payload["max_tokens"] = max_tokens
+        # We usually don't send tools to the vision model
+        if tools:
+            payload["tools"] = tools
+
+        return payload

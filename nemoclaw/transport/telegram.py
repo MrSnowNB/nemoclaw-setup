@@ -107,9 +107,11 @@ class TelegramTransport(Transport):
         memory_store: MemoryStore,
         clause_guards: ClauseGuards,
         permission_pipeline: PermissionPipeline,
+        vision_llm: LLMProvider | None = None,
     ) -> None:
         self.settings = settings
         self.llm = llm
+        self.vision_llm = vision_llm
         self.tool_registry = tool_registry
         self.memory_store = memory_store
         self.clause_guards = clause_guards
@@ -325,6 +327,7 @@ class TelegramTransport(Transport):
                 clause_guards=self.clause_guards,
                 permission_pipeline=self.permission_pipeline,
                 compaction_manager=self._compaction_manager,
+                vision_llm=self.vision_llm,
             )
 
             await post_response_hook(user_text, response, memory_dir=self.settings.memory_dir)
@@ -434,135 +437,5 @@ class TelegramTransport(Transport):
         await app.stop()
         await app.shutdown()
         await self.llm.close()
-
-    # ── Transport ABC (used for standalone mode) ───────────────────
-
-    async def get_input(self) -> str:
-        # Not used in Telegram mode — polling drives input
-        return ""
-
-    async def send_chunk(self, chunk: str) -> None:
-        pass  # Handled via on_chunk callback in _handle_message
-
-    async def send_tool_status(
-        self, tool_name: str, status: str, result: str | None = None,
-    ) -> None:
-        pass  # Handled via on_tool_call callback in _handle_message
-
-    async def send_response(self, response: str) -> None:
-        pass  # Handled in _handle_message
-
-    async def show_error(self, error: str) -> None:
-        pass  # Handled in _handle_message
-
-    # ── Run ────────────────────────────────────────────────────────
-
-    async def run(self) -> None:
-        """Start the Telegram bot with polling."""
-        token = self.settings.telegram_token
-        if not token:
-            raise ValueError(
-                "Telegram token not set. Set NEMOCLAW_TELEGRAM_TOKEN env var."
-            )
-
-        app = Application.builder().token(token).build()
-
-        # Register handlers
-        app.add_handler(CommandHandler("start", self._cmd_start))
-        app.add_handler(CommandHandler("clear", self._cmd_clear))
-        app.add_handler(CommandHandler("tools", self._cmd_tools))
-        app.add_handler(CommandHandler("history", self._cmd_history))
-        app.add_handler(CommandHandler("status", self._cmd_status))
-        app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self._handle_message))
-
-        logger.info("Starting Telegram bot polling...")
-        await app.initialize()
-        await app.start()
-        await app.updater.start_polling()  # type: ignore[union-attr]
-
-        # Wait for shutdown signal
-        stop_event = asyncio.Event()
-
-        def _signal_handler() -> None:
-            stop_event.set()
-
-        loop = asyncio.get_running_loop()
-        for sig in (signal.SIGINT, signal.SIGTERM):
-            try:
-                loop.add_signal_handler(sig, _signal_handler)
-            except NotImplementedError:
-                pass  # Windows doesn't support add_signal_handler
-
-        await stop_event.wait()
-
-        logger.info("Shutting down Telegram bot...")
-        await app.updater.stop()  # type: ignore[union-attr]
-        await app.stop()
-        await app.shutdown()
-        await self.llm.close()
-
-    # ── Transport ABC (used for standalone mode) ───────────────────
-
-    async def get_input(self) -> str:
-        # Not used in Telegram mode — polling drives input
-        return ""
-
-    async def send_chunk(self, chunk: str) -> None:
-        pass  # Handled via on_chunk callback in _handle_message
-
-    async def send_tool_status(
-        self, tool_name: str, status: str, result: str | None = None,
-    ) -> None:
-        pass  # Handled via on_tool_call callback in _handle_message
-
-    async def send_response(self, response: str) -> None:
-        pass  # Handled in _handle_message
-
-    async def show_error(self, error: str) -> None:
-        pass  # Handled in _handle_message
-
-    # ── Run ────────────────────────────────────────────────────────
-
-    async def run(self) -> None:
-        """Start the Telegram bot with polling."""
-        token = self.settings.telegram_token
-        if not token:
-            raise ValueError(
-                "Telegram token not set. Set NEMOCLAW_TELEGRAM_TOKEN env var."
-            )
-
-        app = Application.builder().token(token).build()
-
-        # Register handlers
-        app.add_handler(CommandHandler("start", self._cmd_start))
-        app.add_handler(CommandHandler("clear", self._cmd_clear))
-        app.add_handler(CommandHandler("tools", self._cmd_tools))
-        app.add_handler(CommandHandler("history", self._cmd_history))
-        app.add_handler(CommandHandler("status", self._cmd_status))
-        app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self._handle_message))
-
-        logger.info("Starting Telegram bot polling...")
-        await app.initialize()
-        await app.start()
-        await app.updater.start_polling()  # type: ignore[union-attr]
-
-        # Wait for shutdown signal
-        stop_event = asyncio.Event()
-
-        def _signal_handler() -> None:
-            stop_event.set()
-
-        loop = asyncio.get_running_loop()
-        for sig in (signal.SIGINT, signal.SIGTERM):
-            try:
-                loop.add_signal_handler(sig, _signal_handler)
-            except NotImplementedError:
-                pass  # Windows doesn't support add_signal_handler
-
-        await stop_event.wait()
-
-        logger.info("Shutting down Telegram bot...")
-        await app.updater.stop()  # type: ignore[union-attr]
-        await app.stop()
-        await app.shutdown()
-        await self.llm.close()
+        if self.vision_llm:
+            await self.vision_llm.close()

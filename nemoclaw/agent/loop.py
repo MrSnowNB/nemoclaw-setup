@@ -19,6 +19,7 @@ import logging
 from typing import Any, Callable, Coroutine
 
 from nemoclaw.agent.compaction import CompactionManager
+from nemoclaw.agent.router import Route, classify_intent
 from nemoclaw.guards.clause_guards import ClauseGuards
 from nemoclaw.llm.base import LLMProvider
 from nemoclaw.models import AgentResponse, Message, ToolCall, ToolResult, TokenUsage
@@ -106,8 +107,35 @@ async def _execute_tools(
     return results
 
 
+def sanitize_for_tool_model(messages: list[Message]) -> list[Message]:
+    """Strip non-text content from history before sending to tool model.
+
+    This ensures the tool model only sees plain strings, preventing breakage
+    from multipart vision payloads in the history.
+    """
+    sanitized = []
+    for m in messages:
+        content = m.content
+        if isinstance(content, list):
+            # Extract text parts
+            text_parts = [
+                p.get("text", "")
+                for p in content
+                if isinstance(p, dict) and p.get("type") == "text"
+            ]
+            content = " ".join(text_parts) or None
+
+        sanitized.append(Message(
+            role=m.role,
+            content=content,
+            tool_calls=m.tool_calls,
+            tool_call_id=m.tool_call_id,
+        ))
+    return sanitized
+
+
 async def run_agent_loop(
-    user_input: str,
+    user_input: str | list[dict[str, Any]],
     llm: LLMProvider,
     tools: ToolRegistry,
     system_prompt: str,
@@ -120,11 +148,12 @@ async def run_agent_loop(
     clause_guards: Any | None = None,
     permission_pipeline: Any | None = None,
     compaction_manager: Any | None = None,
+    vision_llm: LLMProvider | None = None,
 ) -> AgentResponse:
     """Run the core ReAct agent loop.
 
     Args:
-        user_input: The user's message.
+        user_input: The user's message (str or multipart list).
         llm: LLM provider instance.
         tools: Tool registry with available tools.
         system_prompt: System prompt (persona + context).
@@ -137,35 +166,67 @@ async def run_agent_loop(
         clause_guards: Optional ClauseGuards for input/output filtering.
         permission_pipeline: Optional PermissionPipeline for tool access control.
         compaction_manager: Optional CompactionManager for context size management.
+        vision_llm: Optional vision-capable LLM provider.
 
     Returns:
         AgentResponse with the final text content and metadata.
     """
-    # ── Input Guards ────────────────────────────────────────────────
-    if clause_guards:
-        guard_result = clause_guards.check_input(user_input)
-        if not guard_result.passed:
-            logger.info("Guard %s blocked input", guard_result.guard_id)
-            blocked_content = guard_result.message
-            history.append(Message(role="user", content=user_input))
-            history.append(Message(role="assistant", content=blocked_content))
-            if session_manager:
-                session_manager.log_message("user", user_input)
-                session_manager.log_message(
-                    "assistant", blocked_content,
-                    metadata={"guard": guard_result.guard_id},
-                )
-            return AgentResponse(
-                content=blocked_content,
-                tool_calls_made=[],
-                token_usage=TokenUsage(),
-                turns_used=0,
-            )
+    # ── Vision Handling ─────────────────────────────────────────────
+    route = classify_intent(user_input)
+    if route == Route.VISION and vision_llm:
+        logger.info("Routing to vision model")
+        # For vision, we call the vision model first to get a text description
+        vision_messages = [Message(role="system", content=system_prompt)] + history
+        vision_messages.append(Message(role="user", content=user_input))
 
-    # Add user message to history
-    history.append(Message(role="user", content=user_input))
-    if session_manager:
-        session_manager.log_message("user", user_input)
+        # Vision model response
+        vision_resp = await vision_llm.chat_completion(
+            messages=vision_messages,
+            stream=False,
+        )
+        vision_content = vision_resp.get("choices", [{}])[0].get("message", {}).get("content", "")
+
+        # Now we have a text description. Inject it as an assistant message
+        # so the tool model knows what's in the image.
+        history.append(Message(role="user", content=user_input))
+        history.append(Message(role="assistant", content=vision_content))
+
+        if session_manager:
+            session_manager.log_message("user", user_input)
+            session_manager.log_message("assistant", vision_content)
+
+        # Update user_input to the vision description for the rest of the loop
+        user_input = vision_content
+    else:
+        # Standard input guards (only for text input)
+        text_input = user_input
+        if isinstance(user_input, list):
+            text_input = " ".join(p.get("text", "") for p in user_input if p.get("type") == "text")
+
+        if clause_guards:
+            guard_result = clause_guards.check_input(text_input)
+            if not guard_result.passed:
+                logger.info("Guard %s blocked input", guard_result.guard_id)
+                blocked_content = guard_result.message
+                history.append(Message(role="user", content=user_input))
+                history.append(Message(role="assistant", content=blocked_content))
+                if session_manager:
+                    session_manager.log_message("user", user_input)
+                    session_manager.log_message(
+                        "assistant", blocked_content,
+                        metadata={"guard": guard_result.guard_id},
+                    )
+                return AgentResponse(
+                    content=blocked_content,
+                    tool_calls_made=[],
+                    token_usage=TokenUsage(),
+                    turns_used=0,
+                )
+
+        # Add user message to history
+        history.append(Message(role="user", content=user_input))
+        if session_manager:
+            session_manager.log_message("user", user_input)
 
     # ── Context Compaction ──────────────────────────────────────────
     if compaction_manager and compaction_manager.needs_compaction(system_prompt, history):
@@ -179,14 +240,12 @@ async def run_agent_loop(
     while turns < max_turns:
         turns += 1
 
-        # Build message list: system + history
-        messages = [Message(role="system", content=system_prompt)] + history
+        # Build message list: system + sanitized history
+        sanitized_history = sanitize_for_tool_model(history)
+        messages = [Message(role="system", content=system_prompt)] + sanitized_history
 
         # Use streaming when we want to stream text to the user, non-streaming
         # when tools are likely (first turn after tool results, or tools available).
-        # We always try non-streaming first if tools are available, since tool_calls
-        # parsing is simpler from a complete response. If the response is text-only
-        # and streaming was requested, we re-issue with streaming for real-time output.
         response = await llm.chat_completion(
             messages=messages,
             tools=tool_schemas if tool_schemas else None,
@@ -208,8 +267,7 @@ async def run_agent_loop(
             tool_calls = _parse_tool_calls(raw_tool_calls)
             all_tool_calls.extend(tool_calls)
 
-            # Append assistant message with ALL tool calls first (API requires
-            # the assistant message to precede any tool-role responses).
+            # Append assistant message with ALL tool calls first
             assistant_msg = Message(
                 role="assistant",
                 content=content,
@@ -235,7 +293,7 @@ async def run_agent_loop(
                         denied_calls.append(tc)
                 tool_calls = permitted_calls
 
-            # Add denial messages as tool results (after assistant message)
+            # Add denial messages as tool results
             for tc in denied_calls:
                 denial_msg = Message(
                     role="tool",
@@ -250,7 +308,6 @@ async def run_agent_loop(
                     )
 
             if not tool_calls:
-                # All tools were denied — continue loop to let LLM retry
                 continue
 
             # Execute tools
@@ -273,14 +330,12 @@ async def run_agent_loop(
             continue
 
         # No tool calls — this is the final text response.
-        # If streaming is requested and we have a callback, re-issue the
-        # request with real streaming so chunks arrive as the LLM generates them.
         if stream and on_chunk:
             final_content = ""
             try:
                 stream_iter = llm.chat_completion_stream(
                     messages=messages,
-                    tools=None,  # No tools for the final text turn
+                    tools=None,
                 )
                 async for chunk in stream_iter:
                     delta = (
@@ -292,7 +347,6 @@ async def run_agent_loop(
                         final_content += delta
                         await on_chunk(delta)
             except Exception:
-                # If streaming fails, fall back to the already-fetched content
                 final_content = content or ""
                 if final_content and on_chunk:
                     await on_chunk(final_content)
@@ -319,12 +373,12 @@ async def run_agent_loop(
             turns_used=turns,
         )
         asyncio.create_task(
-            hooks.post_response_hook(user_input, agent_response)
+            hooks.post_response_hook(str(user_input), agent_response)
         )
 
         return agent_response
 
-    # Max turns reached — return whatever we have
+    # Max turns reached
     max_turns_msg = "[Reached maximum tool-use turns. Stopping.]"
     history.append(Message(role="assistant", content=max_turns_msg))
     if session_manager:
